@@ -203,10 +203,31 @@ describe('plan application', () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  it('refuses to escape the USB root', () => {
-    for (const bad of ['../evil.txt', '..\\evil.txt', '/etc/passwd', 'C:\\Windows\\evil.txt', 'a/../../b', '']) {
+  it('refuses to escape the USB root, whatever the host separator is', () => {
+    const hostile = [
+      '../evil.txt',
+      '..\\evil.txt',
+      '/etc/passwd',
+      '\\\\server\\share\\evil.txt',
+      'C:\\Windows\\evil.txt',
+      'c:/windows/evil.txt',
+      'a/../../b',
+      'a\\..\\..\\b',
+      'sources/../../evil.txt',
+      './../evil.txt',
+      '..',
+      '.',
+      '',
+    ];
+    for (const bad of hostile) {
       assert.throws(() => resolveWithinRoot(root, bad), UnsafePathError, bad);
     }
+  });
+
+  it('accepts backslash separated paths as ordinary nested paths', () => {
+    const resolved = resolveWithinRoot(root, 'sources\\$OEM$\\$$\\Setup\\Scripts\\SetupComplete.cmd');
+    assert.ok(resolved.startsWith(root));
+    assert.ok(resolved.endsWith('SetupComplete.cmd'));
   });
 
   it('resolves ordinary nested paths', () => {

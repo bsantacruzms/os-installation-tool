@@ -14,14 +14,22 @@ export class UnsafePathError extends Error {
  * The plan arrives over HTTP, so its paths are untrusted. Anything that is
  * absolute, has a drive letter, or climbs out of the root is rejected before a
  * single byte is written.
+ *
+ * Backslashes count as separators on every platform. The plan describes Windows
+ * media but may be applied from Linux or macOS, where `..\\evil` would otherwise
+ * be a legal single file name and slip straight past the check.
  */
 export function resolveWithinRoot(root: string, relativePath: string): string {
   if (relativePath.length === 0) throw new UnsafePathError(relativePath);
-  if (isAbsolute(relativePath) || /^[a-zA-Z]:/.test(relativePath) || relativePath.startsWith('\\\\')) {
-    throw new UnsafePathError(relativePath);
-  }
+
+  const unified = relativePath.replace(/\\/g, '/');
+  if (unified.startsWith('/') || /^[a-zA-Z]:/.test(unified)) throw new UnsafePathError(relativePath);
+
+  const segments = unified.split('/').filter((segment) => segment.length > 0 && segment !== '.');
+  if (segments.length === 0 || segments.includes('..')) throw new UnsafePathError(relativePath);
+
   const normalizedRoot = resolve(root);
-  const target = resolve(normalizedRoot, relativePath);
+  const target = resolve(normalizedRoot, ...segments);
   const rel = relative(normalizedRoot, target);
   if (rel.length === 0 || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
     throw new UnsafePathError(relativePath);
