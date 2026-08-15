@@ -1,0 +1,14 @@
+# Keep line endings deterministic regardless of who checks the repo out.
+* text=auto eol=lf
+
+# Shell scripts must stay LF or they fail to run on Linux and macOS.
+*.sh text eol=lf
+
+# Windows-only scripts are more predictable with CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+*.png binary
+*.ico binary
+*.woff2 binary
