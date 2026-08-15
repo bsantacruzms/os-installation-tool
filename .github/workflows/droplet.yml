@@ -1,0 +1,70 @@
+name: Deploy web app to the droplet
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/web/**'
+      - 'packages/shared/**'
+      - '.github/workflows/droplet.yml'
+  workflow_dispatch:
+
+# The web app is static, so the droplet only ever receives files. Nothing is
+# executed there and no runtime is needed.
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the droplet secrets are configured
+        id: gate
+        run: |
+          if [ -z "${{ secrets.DROPLET_HOST }}" ] || [ -z "${{ secrets.DROPLET_SSH_KEY }}" ]; then
+            echo "Droplet secrets are not set, skipping." >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          node-version: '22'
+
+      - name: Test the shared logic
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          npm --prefix packages/shared install
+          npm --prefix packages/shared run test
+
+      - name: Build the web app
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          npm --prefix packages/web install
+          npm --prefix packages/web run build
+
+      - name: Publish over rsync
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          HOST: ${{ secrets.DROPLET_HOST }}
+          USER: ${{ secrets.DROPLET_USER }}
+          TARGET: ${{ secrets.DROPLET_PATH }}
+          PORT: ${{ secrets.DROPLET_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.DROPLET_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Pin the host key so the upload cannot be silently redirected.
+          printf '%s\n' "${{ secrets.DROPLET_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p ${PORT:-22} -o IdentitiesOnly=yes" \
+            packages/web/dist/ \
+            "${USER}@${HOST}:${TARGET}/"
+
+      - name: Remove the key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

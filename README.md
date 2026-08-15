@@ -97,27 +97,49 @@ cd packages/shared && npx tsx scripts/check-microsoft.ts
 
 ## Deployment
 
+The web app is a static bundle with relative asset paths, so it works unchanged at a domain
+root or at a subpath, and it can be hosted anywhere that serves files. There is no API to run.
+
+### GitHub Pages
+
 Live at <https://bsantacruzms.github.io/os-installation-tool/>.
 
-`.github/workflows/pages.yml` builds `packages/web` and publishes it to GitHub Pages on every
-push to `main` that touches the web or shared packages. The shared tests gate the deploy. The
-bundle uses relative asset paths, so it works unchanged at a subpath or at a domain root.
-
-### Moving it to a custom domain
-
-Set a `PAGES_DOMAIN` repository variable to the hostname, then add one DNS record:
-
-| Type | Name | Value | Proxy |
-| --- | --- | --- | --- |
-| CNAME | the subdomain | `bsantacruzms.github.io` | DNS only |
-
+`.github/workflows/pages.yml` builds and publishes on every push to `main` that touches the web
+or shared packages. The shared tests gate the deploy. To move it onto a custom domain, set a
+`PAGES_DOMAIN` repository variable and add a `CNAME` record pointing at `bsantacruzms.github.io`.
 On Cloudflare the record must be **DNS only** (grey cloud), at least until GitHub has issued the
-certificate, otherwise domain verification fails and "Enforce HTTPS" stays greyed out. Set the
-domain under **Settings > Pages > Custom domain**, wait for the certificate, then tick
-**Enforce HTTPS**.
+certificate, or verification fails and "Enforce HTTPS" stays greyed out.
 
-Add the new origin to `OFFICIAL_ORIGINS` in `packages/agent/src/security.ts` as well, or the
-agent will refuse to talk to the page.
+### Your own server
+
+Because it is only static files, any existing web server can host it. That is usually simpler
+than moving DNS, since it leaves whatever else lives on the domain alone.
+
+```bash
+./deploy/publish.sh root@os.brionicx.com:/var/www/osit
+```
+
+`deploy/nginx/osit.conf` is a ready nginx server block with the right cache headers and a
+Content-Security-Policy that permits the one cross-origin call the page makes, to the helper on
+`127.0.0.1:5179`.
+
+For automatic deploys, `.github/workflows/droplet.yml` rsyncs the build on every push. It skips
+cleanly when the secrets are absent, so it never blocks anything. Set:
+
+| Secret | Meaning |
+| --- | --- |
+| `DROPLET_HOST` | Hostname or IP |
+| `DROPLET_USER` | SSH user |
+| `DROPLET_PATH` | Web root, e.g. `/var/www/osit` |
+| `DROPLET_SSH_KEY` | Private key for that user |
+| `DROPLET_KNOWN_HOSTS` | Output of `ssh-keyscan <host>`, so the upload cannot be redirected |
+| `DROPLET_SSH_PORT` | Optional, defaults to 22 |
+
+### Whichever host you use
+
+Add the origin to `OFFICIAL_ORIGINS` in `packages/agent/src/security.ts`, or the helper will
+refuse to talk to the page. `https://os.brionicx.com` and `https://bsantacruzms.github.io` are
+already there.
 
 ## Layout
 
