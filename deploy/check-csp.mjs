@@ -11,7 +11,7 @@ import { extname, join, resolve } from 'node:path';
  */
 const CSP =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
-  "connect-src 'self' http://127.0.0.1:5179 http://localhost:5179 ws://127.0.0.1:5179 ws://localhost:5179; " +
+  "connect-src 'self' http://127.0.0.1:5179 http://localhost:5179; " +
   "frame-ancestors 'none'; base-uri 'self'";
 
 const TYPES = {

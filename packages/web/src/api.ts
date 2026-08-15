@@ -137,11 +137,11 @@ export class AgentClient {
     return this.call<{ cancelled: boolean }>(`/agent/jobs/${jobId}/cancel`, { method: 'POST' });
   }
 
-  /** Live progress. Returns a function that closes the socket. */
+  /** Live progress over server-sent events. Returns a function that stops it. */
   subscribe(onProgress: (progress: JobProgress) => void, onLog: (message: string) => void): () => void {
-    const wsUrl = `${this.baseUrl.replace(/^http/, 'ws')}/agent/events?code=${encodeURIComponent(this.code)}`;
-    const socket = new WebSocket(wsUrl);
-    socket.onmessage = (event) => {
+    const url = `${this.baseUrl}/agent/events?code=${encodeURIComponent(this.code)}`;
+    const source = new EventSource(url);
+    source.onmessage = (event) => {
       try {
         const message = JSON.parse(String(event.data)) as { type: string; progress?: JobProgress; message?: string };
         if (message.type === 'progress' && message.progress) onProgress(message.progress);
@@ -150,6 +150,6 @@ export class AgentClient {
         // A malformed frame is not worth tearing the UI down for.
       }
     };
-    return () => socket.close();
+    return () => source.close();
   }
 }

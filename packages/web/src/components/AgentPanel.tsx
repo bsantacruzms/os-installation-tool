@@ -11,6 +11,24 @@ export interface AgentState {
   devices: UsbDevice[];
 }
 
+const RELEASE = 'https://github.com/bsantacruzms/os-installation-tool/releases/latest/download';
+
+const HELPER_DOWNLOADS = [
+  { id: 'windows', label: 'Windows', hint: 'osit-agent.exe', url: `${RELEASE}/osit-agent-windows-x64.exe` },
+  { id: 'macos', label: 'macOS', hint: 'Apple silicon', url: `${RELEASE}/osit-agent-macos-arm64` },
+  { id: 'macos-intel', label: 'macOS', hint: 'Intel', url: `${RELEASE}/osit-agent-macos-x64` },
+  { id: 'linux', label: 'Linux', hint: 'x64', url: `${RELEASE}/osit-agent-linux-x64` },
+];
+
+/** Best guess so the right download is highlighted first. */
+function detectPlatform(): string {
+  const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+  if (/Win/i.test(ua)) return 'windows';
+  if (/Mac/i.test(ua)) return /Intel/i.test(ua) && !/ARM|Apple/i.test(ua) ? 'macos-intel' : 'macos';
+  if (/Linux|X11/i.test(ua)) return 'linux';
+  return 'windows';
+}
+
 export function AgentPanel({
   state,
   onConnected,
@@ -35,15 +53,22 @@ export function AgentPanel({
   const [status, setStatus] = useState<'idle' | 'checking' | 'found' | 'missing'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const detectedPlatform = detectPlatform();
 
   useEffect(() => {
     let cancelled = false;
     setStatus('checking');
-    AgentClient.ping(baseUrl.replace(/\/$/, ''))
-      .then(() => !cancelled && setStatus('found'))
-      .catch(() => !cancelled && setStatus('missing'));
+    // The helper may be started while this page is open, so keep looking.
+    const probe = () => {
+      AgentClient.ping(baseUrl.replace(/\/$/, ''))
+        .then(() => !cancelled && setStatus('found'))
+        .catch(() => !cancelled && setStatus('missing'));
+    };
+    probe();
+    const timer = setInterval(probe, 3000);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, [baseUrl]);
 
@@ -80,19 +105,25 @@ export function AgentPanel({
         subtitle="A browser cannot format a USB stick on its own. A small helper runs on your machine and does the privileged work; this page just tells it what to build."
       >
         {status === 'missing' ? (
-          <Banner tone="info" title="Helper not detected">
-            <p>Get it once, then run it whenever you want to build a stick:</p>
-            <pre className="code">{`git clone https://github.com/bsantacruzms/os-installation-tool
-cd os-installation-tool
-npm run setup && npm run build
-npm run dev:agent`}</pre>
-            <p>
-              On Windows use an Administrator terminal. On macOS and Linux use <code>sudo</code>. It prints a pairing code; type
-              that below.
-            </p>
-            <p>
-              If your browser refuses to talk to it, open <code>http://127.0.0.1:5179</code> instead. The helper serves this
-              same page locally.
+          <Banner tone="info" title="Helper not running">
+            <p>Download it once. One file, nothing to install, no account.</p>
+            <div className="downloads">
+              {HELPER_DOWNLOADS.map((item) => (
+                <a
+                  key={item.id}
+                  className={`download ${item.id === detectedPlatform ? 'download--suggested' : ''}`}
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  <strong>{item.label}</strong>
+                  <span>{item.hint}</span>
+                </a>
+              ))}
+            </div>
+            <p className="muted">
+              Run it, then type the pairing code it prints below. It needs administrator rights on Windows, or{' '}
+              <code>sudo</code> on macOS and Linux, because formatting a drive does.
             </p>
           </Banner>
         ) : null}

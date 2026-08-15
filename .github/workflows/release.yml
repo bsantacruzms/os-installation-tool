@@ -1,0 +1,106 @@
+name: Release helper binaries
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            asset: osit-agent-windows-x64.exe
+            built: packages/agent/dist/bin/osit-agent.exe
+          - os: macos-latest
+            asset: osit-agent-macos-arm64
+            built: packages/agent/dist/bin/osit-agent
+          - os: macos-13
+            asset: osit-agent-macos-x64
+            built: packages/agent/dist/bin/osit-agent
+          - os: ubuntu-latest
+            asset: osit-agent-linux-x64
+            built: packages/agent/dist/bin/osit-agent
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # The helper embeds the web app so it works with no internet at all.
+      - name: Build the web app
+        run: |
+          npm --prefix packages/web install
+          npm --prefix packages/web run build
+
+      - name: Build the single executable
+        run: |
+          npm --prefix packages/agent install
+          npm --prefix packages/agent run build:binary
+
+      - name: Check it starts and answers
+        shell: bash
+        run: |
+          set -e
+          chmod +x "${{ matrix.built }}" || true
+          OSIT_AGENT_CODE=CISMOKETEST0 "${{ matrix.built }}" &
+          pid=$!
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5179/agent/ping > /dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:5179/agent/ping
+          # The embedded interface must be served without a pairing code.
+          curl -fsS http://127.0.0.1:5179/ | grep -q "<title>"
+          kill $pid
+
+      - name: Name the asset
+        shell: bash
+        run: |
+          mkdir -p out
+          cp "${{ matrix.built }}" "out/${{ matrix.asset }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: out/${{ matrix.asset }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          cd assets
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: assets/*
+          generate_release_notes: true
+          body: |
+            Download the helper for your system, run it, then open
+            https://bsantacruzms.github.io/os-installation-tool/ and enter the
+            pairing code it prints.
+
+            One file. Nothing to install. It needs administrator or `sudo`
+            because formatting a drive does.
+
+            macOS and Linux: `chmod +x` the file first. macOS will also want
+            Right click > Open the first time, since the binary is not notarised.
+
+            Verify your download against `SHA256SUMS.txt`.

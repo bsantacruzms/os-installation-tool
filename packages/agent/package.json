@@ -4,21 +4,22 @@
   "private": true,
   "type": "module",
   "main": "dist/index.mjs",
-  "bin": { "osit-agent": "dist/index.mjs" },
-  "scripts": {
-    "build": "node build.mjs",
-    "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node -e \"require('fs').rmSync('dist-test',{recursive:true,force:true})\" && tsc -p tsconfig.test.json && node --test \"dist-test/**/*.test.js\""
+  "bin": {
+    "osit-agent": "dist/index.mjs"
   },
-  "dependencies": {
-    "ws": "^8.18.0"
+  "scripts": {
+    "embed": "node scripts/embed-web.mjs",
+    "build": "npm run embed && node build.mjs",
+    "build:binary": "npm run embed && node build.mjs --sea && node scripts/build-binary.mjs",
+    "dev": "npm run embed && tsx watch src/index.ts",
+    "start": "node dist/index.mjs",
+    "typecheck": "npm run embed && tsc -p tsconfig.json --noEmit",
+    "test": "npm run embed && node -e \"require('fs').rmSync('dist-test',{recursive:true,force:true})\" && tsc -p tsconfig.test.json && node --test \"dist-test/**/*.test.js\""
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "@types/ws": "^8.5.13",
     "esbuild": "^0.24.2",
+    "postject": "^1.0.0-alpha.6",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

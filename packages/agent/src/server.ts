@@ -1,5 +1,4 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { WebSocketServer, type WebSocket } from 'ws';
 
 import type { AgentInfo, JobProgress } from '../../shared/src/types.js';
 import { TtlCache } from '../../shared/src/cache.js';
@@ -58,7 +57,7 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
 
 export function createAgentServer(options: AgentServerOptions) {
   const jobs = new JobManager(options.workDirectory);
-  const sockets = new Set<WebSocket>();
+  const listeners = new Set<ServerResponse>();
 
   const authorized = (request: IncomingMessage, url: URL): boolean => {
     const header = request.headers['authorization'];
@@ -99,8 +98,7 @@ export function createAgentServer(options: AgentServerOptions) {
     }
 
     if (!authorized(request, url)) {
-      if (options.webRoot && !url.pathname.startsWith('/agent/') && request.method === 'GET') {
-        serveStatic(options.webRoot, url.pathname, response);
+      if (!url.pathname.startsWith('/agent/') && request.method === 'GET' && serveStatic(options.webRoot ?? null, url.pathname, response)) {
         return;
       }
       json(response, 401, { error: 'Enter the pairing code shown in the agent window.' });
@@ -169,8 +167,32 @@ export function createAgentServer(options: AgentServerOptions) {
         return;
       }
 
-      if (options.webRoot && request.method === 'GET' && !url.pathname.startsWith('/agent/')) {
-        serveStatic(options.webRoot, url.pathname, response);
+      if (request.method === 'GET' && url.pathname === '/agent/events') {
+        // Server-sent events: the feed only ever goes one way, so a WebSocket
+        // would buy nothing and would cost a dependency.
+        response.writeHead(200, {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-store',
+          Connection: 'keep-alive',
+          'X-Accel-Buffering': 'no',
+          ...(origin ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' } : {}),
+        });
+        response.write(`retry: 2000\n\n`);
+        response.write(`data: ${JSON.stringify({ type: 'hello', jobs: jobs.list() })}\n\n`);
+        listeners.add(response);
+
+        // Proxies and laptops sleeping mid-download will drop an idle socket.
+        const heartbeat = setInterval(() => response.write(': ping\n\n'), 20_000);
+        const close = () => {
+          clearInterval(heartbeat);
+          listeners.delete(response);
+        };
+        request.on('close', close);
+        request.on('error', close);
+        return;
+      }
+
+      if (request.method === 'GET' && !url.pathname.startsWith('/agent/') && serveStatic(options.webRoot ?? null, url.pathname, response)) {
         return;
       }
 
@@ -184,26 +206,10 @@ export function createAgentServer(options: AgentServerOptions) {
     }
   }
 
-  const wss = new WebSocketServer({ noServer: true });
-
-  server.on('upgrade', (request, socket, head) => {
-    const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
-    if (url.pathname !== '/agent/events' || !isAllowedOrigin(request.headers.origin, options.extraOrigins ?? []) || !authorized(request, url)) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      sockets.add(ws);
-      ws.on('close', () => sockets.delete(ws));
-      ws.send(JSON.stringify({ type: 'hello', jobs: jobs.list() }));
-    });
-  });
-
   const broadcast = (message: unknown) => {
-    const payload = JSON.stringify(message);
-    for (const socket of sockets) {
-      if (socket.readyState === socket.OPEN) socket.send(payload);
+    const payload = `data: ${JSON.stringify(message)}\n\n`;
+    for (const listener of listeners) {
+      if (!listener.writableEnded) listener.write(payload);
     }
   };
   jobs.on('progress', (progress: JobProgress) => broadcast({ type: 'progress', progress }));
@@ -216,8 +222,7 @@ export function createAgentServer(options: AgentServerOptions) {
         server.listen(options.port, options.host, resolve);
       }),
     close: async () => {
-      for (const socket of sockets) socket.close();
-      wss.close();
+      for (const listener of listeners) listener.end();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
   };

@@ -722,6 +722,57 @@ code {
   font-size: 0.82rem;
 }
 
+/* Helper downloads -------------------------------------------------- */
+.downloads {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.download {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 11px 13px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 130ms ease, transform 110ms ease;
+}
+
+.download:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.download strong {
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.download span {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.download--suggested {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+.download--suggested::after {
+  content: 'Your system';
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--accent);
+  font-weight: 700;
+  margin-top: 2px;
+}
+
 /* Progress ---------------------------------------------------------- */
 .progress {
   height: 10px;

@@ -18,3 +18,8 @@ test-output.txt
 Thumbs.db
 .vite/
 coverage/
+
+packages/agent/src/generated/
+
+packages/agent/dist-sea/
+packages/agent/dist/bin/
