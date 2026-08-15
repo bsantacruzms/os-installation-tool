@@ -37,7 +37,7 @@ a good thing. So the tool is split in two:
 | Part | Runs where | Does what |
 | --- | --- | --- |
 | Web app | Any browser, any OS. Static files only | Builds the answer file and the plan, entirely client side |
-| Local agent | Your machine, elevated | Resolves the ISO link, downloads, partitions, formats, copies, injects |
+| Local helper | Your machine, elevated | Resolves the ISO link, downloads, partitions, formats, copies, injects |
 
 Everything except the Microsoft download link is pure logic, so it runs in the browser. That has
 three consequences worth knowing:
@@ -48,13 +48,10 @@ three consequences worth knowing:
 - The Microsoft request comes from *your* connection. Microsoft rate limits and blocks data
   centre IP ranges, so resolving from a hosted server is exactly the thing that gets refused.
 
-The agent binds to `127.0.0.1` only, accepts pages from localhost and `https://os.brionicx.com`
-and nothing else, and requires a pairing code that it prints to its own console. The plan it
+The helper binds to `127.0.0.1` only, accepts pages from localhost and the official site and
+nothing else, and requires a pairing code that it prints to its own console. The plan it
 receives is re-validated before use, and any path that tries to escape the USB root is rejected.
-
-The agent also serves the same web app on `http://127.0.0.1:5179`, so the tool still works with
-no internet connection and in browsers that refuse to let an https page talk to a plain http
-localhost service.
+Progress comes back over server-sent events, so the helper has no runtime dependencies at all.
 
 `packages/server` is optional. It exists for self-hosting the API and is not needed by the
 deployed site.
@@ -86,6 +83,20 @@ else does not change any of it:
 
 Hence the helper. It is small, it is auditable, and it only runs while you are using it.
 
+## Using it
+
+1. Open <https://bsantacruzms.github.io/os-installation-tool/>
+2. Download the helper for your system when the page asks. One file, nothing to install.
+3. Run it. It prints a pairing code.
+4. Type that code into the page.
+
+The helper needs Administrator on Windows, or `sudo` on macOS and Linux, because formatting a
+drive does. On macOS and Linux, `chmod +x` it first; macOS will also want Right click > Open the
+first time, because the binary is not notarised.
+
+No internet, or a browser that refuses to talk to a local service? Open <http://127.0.0.1:5179>
+instead. The helper carries the same interface inside it.
+
 ## Requirements
 
 - Node.js 20.11 or newer.
@@ -94,27 +105,30 @@ Hence the helper. It is small, it is auditable, and it only runs while you are u
 - **Linux**: `sudo`, plus `gdisk`, `dosfstools`, `rsync` and `wimtools`.
 - A USB stick of 8 GB or more. Everything on it is destroyed.
 
-## Running it
+## Building it yourself
 
 ```bash
 npm run setup          # installs dependencies for every package
-npm run build          # builds shared, server, agent and web
+npm run build          # builds shared, agent and web
 
 # the privileged helper (Administrator on Windows, sudo elsewhere)
 npm run dev:agent
 ```
-
-The agent prints a pairing code. Then either:
-
-- open <https://os.brionicx.com> and enter the code, or
-- open <http://127.0.0.1:5179>, which the agent serves itself.
 
 For UI work with hot reload, `npm run dev` starts Vite on port 5173.
 
 ```bash
 npm test               # unit tests for the shared logic, the API and the agent
 npm run typecheck      # strict type check across every package
+
+# a single executable for the platform you are on
+npm --prefix packages/agent run build:binary
 ```
+
+The binary is built with Node's own single executable support, so there is no third-party
+packer in the chain. It cannot be cross-compiled: each platform's binary is built on that
+platform, which is what the release workflow's matrix is for. The web app is embedded into it at
+build time, so the helper works with no files beside it and no network.
 
 To check the live Microsoft download flow without writing anything:
 
