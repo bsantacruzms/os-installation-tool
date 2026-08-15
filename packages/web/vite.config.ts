@@ -4,6 +4,9 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
+  // Relative asset paths, so the same bundle works at a domain root and at a
+  // project-pages subpath without being rebuilt.
+  base: './',
   resolve: {
     alias: {
       '@shared': fileURLToPath(new URL('../shared/src', import.meta.url)),

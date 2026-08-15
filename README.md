@@ -97,18 +97,27 @@ cd packages/shared && npx tsx scripts/check-microsoft.ts
 
 ## Deployment
 
+Live at <https://bsantacruzms.github.io/os-installation-tool/>.
+
 `.github/workflows/pages.yml` builds `packages/web` and publishes it to GitHub Pages on every
-push to `main` that touches the web or shared packages. The shared tests gate the deploy.
+push to `main` that touches the web or shared packages. The shared tests gate the deploy. The
+bundle uses relative asset paths, so it works unchanged at a subpath or at a domain root.
 
-The custom domain needs one DNS record at the `brionicx.com` zone:
+### Moving it to a custom domain
 
-| Type | Name | Value |
-| --- | --- | --- |
-| CNAME | `os` | `<github-user>.github.io` |
+Set a `PAGES_DOMAIN` repository variable to the hostname, then add one DNS record:
 
-Then set the same domain under **Settings > Pages > Custom domain** and tick **Enforce HTTPS**.
-The domain is also pinned in `packages/agent/src/security.ts`; change it there if the site ever
-moves, or the agent will refuse the new origin.
+| Type | Name | Value | Proxy |
+| --- | --- | --- | --- |
+| CNAME | the subdomain | `bsantacruzms.github.io` | DNS only |
+
+On Cloudflare the record must be **DNS only** (grey cloud), at least until GitHub has issued the
+certificate, otherwise domain verification fails and "Enforce HTTPS" stays greyed out. Set the
+domain under **Settings > Pages > Custom domain**, wait for the certificate, then tick
+**Enforce HTTPS**.
+
+Add the new origin to `OFFICIAL_ORIGINS` in `packages/agent/src/security.ts` as well, or the
+agent will refuse to talk to the page.
 
 ## Layout
 

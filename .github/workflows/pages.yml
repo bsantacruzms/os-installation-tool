@@ -42,7 +42,11 @@ jobs:
           npm --prefix packages/web run build
 
       - name: Add the custom domain
-        run: echo 'os.brionicx.com' > packages/web/dist/CNAME
+        # Set the PAGES_DOMAIN repository variable to move the site onto a
+        # custom domain. Without it the site stays on github.io and no existing
+        # DNS is disturbed.
+        if: vars.PAGES_DOMAIN != ''
+        run: echo '${{ vars.PAGES_DOMAIN }}' > packages/web/dist/CNAME
 
       - name: Disable Jekyll processing
         run: touch packages/web/dist/.nojekyll

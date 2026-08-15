@@ -47,8 +47,8 @@ console.log(`  Platform       ${process.platform} ${process.arch}`);
 console.log('');
 console.log(`  Pairing code   ${pairingCode}`);
 console.log('');
-console.log('  Open https://os.brionicx.com and enter that code, or if your');
-console.log(`  browser blocks it, open http://${host}:${port} instead.`);
+console.log('  Open https://bsantacruzms.github.io/os-installation-tool/ and enter');
+console.log(`  that code, or if your browser blocks it, open http://${host}:${port}.`);
 console.log('  Keep this window open while a USB stick is being written.');
 
 if (!prerequisites.ok && prerequisites.missing.length > 0) {

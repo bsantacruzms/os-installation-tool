@@ -30,11 +30,11 @@ export function codesMatch(expected: string, provided: string | undefined | null
 }
 
 /**
- * The official site is pinned here so the hosted build can drive a local agent.
- * It is an allowlist of one exact origin, and the pairing code is still
- * required on top of it: reaching the agent is not the same as controlling it.
+ * The official sites are pinned here so a hosted build can drive a local agent.
+ * It is an allowlist of exact origins, and the pairing code is still required on
+ * top of it: reaching the agent is not the same as controlling it.
  */
-export const OFFICIAL_ORIGINS = ['https://os.brionicx.com'];
+export const OFFICIAL_ORIGINS = ['https://os.brionicx.com', 'https://bsantacruzms.github.io'];
 
 /**
  * Only localhost pages and the official site may drive the agent. A malicious
