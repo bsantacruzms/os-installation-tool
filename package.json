@@ -1,0 +1,23 @@
+{
+  "name": "os-installation-tool",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Create bootable Windows 11 and Linux USB drives from any OS, with zero-touch unattended setup and privacy hardening baked in.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "comments": {
+    "why-no-workspaces": "This repo lives on a mapped network drive that cannot create symlinks, so npm workspaces fail with EPERM/UNKNOWN on symlink. Each package installs its own dependencies and imports shared code by relative path; esbuild inlines it at build time."
+  },
+  "scripts": {
+    "setup": "npm --prefix packages/shared install && npm --prefix packages/server install && npm --prefix packages/agent install && npm --prefix packages/web install",
+    "build": "npm --prefix packages/shared run build && npm --prefix packages/server run build && npm --prefix packages/agent run build && npm --prefix packages/web run build",
+    "test": "npm --prefix packages/shared run test && npm --prefix packages/server run test && npm --prefix packages/agent run test",
+    "typecheck": "npm --prefix packages/shared run typecheck && npm --prefix packages/server run typecheck && npm --prefix packages/agent run typecheck && npm --prefix packages/web run typecheck",
+    "dev": "npm --prefix packages/web run dev",
+    "dev:server": "npm --prefix packages/server run dev",
+    "dev:agent": "npm --prefix packages/agent run dev"
+  }
+}
