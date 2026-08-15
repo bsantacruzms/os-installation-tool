@@ -21,12 +21,12 @@ jobs:
           - os: macos-latest
             asset: osit-agent-macos-arm64
             built: packages/agent/dist/bin/osit-agent
-          - os: macos-13
-            asset: osit-agent-macos-x64
-            built: packages/agent/dist/bin/osit-agent
           - os: ubuntu-latest
             asset: osit-agent-linux-x64
             built: packages/agent/dist/bin/osit-agent
+          # Intel macOS is deliberately absent: the macos-13 runner queues for
+          # so long that it holds up every other platform. Anyone on an Intel
+          # Mac can build it in one command with `npm run build:binary`.
 
     steps:
       - uses: actions/checkout@v4
@@ -111,5 +111,8 @@ jobs:
 
             macOS and Linux: `chmod +x` the file first. macOS will also want
             Right click > Open the first time, since the binary is not notarised.
+
+            On an Intel Mac, build it yourself in one command:
+            `npm --prefix packages/agent run build:binary`
 
             Verify your download against `SHA256SUMS.txt`.
