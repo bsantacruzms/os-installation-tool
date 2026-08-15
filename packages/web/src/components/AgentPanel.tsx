@@ -11,13 +11,23 @@ export interface AgentState {
   devices: UsbDevice[];
 }
 
-const RELEASE = 'https://github.com/bsantacruzms/os-installation-tool/releases/latest/download';
+const REPO = 'bsantacruzms/os-installation-tool';
+const RELEASE = `https://github.com/${REPO}/releases/latest/download`;
 
-const HELPER_DOWNLOADS = [
-  { id: 'windows', label: 'Windows', hint: 'osit-agent.exe', url: `${RELEASE}/osit-agent-windows-x64.exe` },
-  { id: 'macos', label: 'macOS', hint: 'Apple silicon', url: `${RELEASE}/osit-agent-macos-arm64` },
-  { id: 'macos-intel', label: 'macOS', hint: 'Intel', url: `${RELEASE}/osit-agent-macos-x64` },
-  { id: 'linux', label: 'Linux', hint: 'x64', url: `${RELEASE}/osit-agent-linux-x64` },
+interface HelperDownload {
+  id: string;
+  label: string;
+  hint: string;
+  url: string;
+  /** Suffix of the released file name this entry corresponds to. */
+  asset: string;
+}
+
+const HELPER_DOWNLOADS: HelperDownload[] = [
+  { id: 'windows', label: 'Windows', hint: 'osit-agent.exe', asset: 'osit-agent-windows-x64.exe', url: `${RELEASE}/osit-agent-windows-x64.exe` },
+  { id: 'macos', label: 'macOS', hint: 'Apple silicon', asset: 'osit-agent-macos-arm64', url: `${RELEASE}/osit-agent-macos-arm64` },
+  { id: 'macos-intel', label: 'macOS', hint: 'Intel', asset: 'osit-agent-macos-x64', url: `${RELEASE}/osit-agent-macos-x64` },
+  { id: 'linux', label: 'Linux', hint: 'x64', asset: 'osit-agent-linux-x64', url: `${RELEASE}/osit-agent-linux-x64` },
 ];
 
 /** Best guess so the right download is highlighted first. */
@@ -27,6 +37,33 @@ function detectPlatform(): string {
   if (/Mac/i.test(ua)) return /Intel/i.test(ua) && !/ARM|Apple/i.test(ua) ? 'macos-intel' : 'macos';
   if (/Linux|X11/i.test(ua)) return 'linux';
   return 'windows';
+}
+
+/**
+ * Asks GitHub which binaries actually exist, so a platform whose runner was
+ * unavailable is hidden rather than offered as a dead link.
+ */
+function useAvailableDownloads(): HelperDownload[] {
+  const [available, setAvailable] = useState<HelperDownload[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('no release'))))
+      .then((release: { assets?: Array<{ name: string }> }) => {
+        const names = new Set((release.assets ?? []).map((a) => a.name));
+        if (!cancelled && names.size > 0) {
+          setAvailable(HELPER_DOWNLOADS.filter((d) => names.has(d.asset)));
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Before the answer arrives, show everything rather than an empty panel.
+  return available ?? HELPER_DOWNLOADS;
 }
 
 export function AgentPanel({
@@ -54,6 +91,7 @@ export function AgentPanel({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const detectedPlatform = detectPlatform();
+  const downloads = useAvailableDownloads();
 
   useEffect(() => {
     let cancelled = false;
@@ -108,7 +146,7 @@ export function AgentPanel({
           <Banner tone="info" title="Helper not running">
             <p>Download it once. One file, nothing to install, no account.</p>
             <div className="downloads">
-              {HELPER_DOWNLOADS.map((item) => (
+              {downloads.map((item) => (
                 <a
                   key={item.id}
                   className={`download ${item.id === detectedPlatform ? 'download--suggested' : ''}`}
@@ -123,7 +161,11 @@ export function AgentPanel({
             </div>
             <p className="muted">
               Run it, then type the pairing code it prints below. It needs administrator rights on Windows, or{' '}
-              <code>sudo</code> on macOS and Linux, because formatting a drive does.
+              <code>sudo</code> on macOS and Linux, because formatting a drive does.{' '}
+              <a href={`https://github.com/${REPO}/releases/latest`} target="_blank" rel="noreferrer noopener">
+                All downloads and checksums
+              </a>
+              .
             </p>
           </Banner>
         ) : null}

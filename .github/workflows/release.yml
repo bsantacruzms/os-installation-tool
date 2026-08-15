@@ -75,12 +75,21 @@ jobs:
 
   release:
     needs: build
+    # One scarce runner should not hold up the whole release. Whatever built
+    # gets published; a re-run adds the rest later.
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: assets
           merge-multiple: true
+
+      - name: Refuse to publish an empty release
+        run: |
+          count=$(ls -1 assets | wc -l)
+          echo "Got $count binaries."
+          test "$count" -gt 0
 
       - name: Checksums
         run: |
