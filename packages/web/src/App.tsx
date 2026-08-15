@@ -22,6 +22,7 @@ export function App() {
   const [agent, setAgent] = useState<AgentState>(EMPTY_AGENT);
   const [deviceId, setDeviceId] = useState('');
   const [requireRemovable, setRequireRemovable] = useState(true);
+  const [keepIso, setKeepIso] = useState(false);
 
   const [confirming, setConfirming] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -61,6 +62,7 @@ export function App() {
         plan,
         volumeLabel: 'WIN11',
         requireRemovable,
+        keepIso,
       });
 
       setProgress(created.progress);
@@ -80,7 +82,7 @@ export function App() {
     } finally {
       setStarting(false);
     }
-  }, [agent.client, catalog, config, plan, requireRemovable, selectedDevice]);
+  }, [agent.client, catalog, config, keepIso, plan, requireRemovable, selectedDevice]);
 
   return (
     <main className="shell">
@@ -143,6 +145,8 @@ export function App() {
             onSelectDevice={setDeviceId}
             requireRemovable={requireRemovable}
             onRequireRemovableChange={setRequireRemovable}
+            keepIso={keepIso}
+            onKeepIsoChange={setKeepIso}
           />
 
           {plan ? <PlanSummary plan={plan} device={selectedDevice} /> : null}

@@ -1,4 +1,4 @@
-import { stat } from 'node:fs/promises';
+import { rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { CreateUsbRequest, JobPhase, UsbDevice } from '../../../shared/src/types.js';
@@ -181,5 +181,18 @@ export async function createBootableUsb(options: WriterOptions): Promise<void> {
   // ---- Finish -------------------------------------------------------------
   beginPhase('finalizing', 'Finishing up');
   await platform.finish(target, device, events.onLog);
+
+  // Only a downloaded ISO is ours to delete, and only once the stick is built.
+  if (isoSource.kind === 'url' && !request.keepIso) {
+    try {
+      await rm(isoPath, { force: true });
+      events.onLog(`Deleted ${isoPath}. Nothing from this build is left on the computer.`);
+    } catch (error) {
+      events.onLog(`Could not delete the downloaded ISO at ${isoPath}: ${String(error)}`);
+    }
+  } else if (isoSource.kind === 'url') {
+    events.onLog(`Kept the downloaded ISO at ${isoPath} for next time.`);
+  }
+
   report('finalizing', 1, 'Done');
 }

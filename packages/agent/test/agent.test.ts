@@ -170,6 +170,14 @@ describe('request validation', () => {
     assert.equal(parsed.plan.injectedFiles.length, 1);
   });
 
+  it('does not keep the downloaded ISO unless asked to', () => {
+    assert.equal(parseCreateUsbRequest(base).keepIso, false);
+    assert.equal(parseCreateUsbRequest({ ...base, keepIso: true }).keepIso, true);
+    // Anything other than a real true must not be read as consent to keep it.
+    assert.equal(parseCreateUsbRequest({ ...base, keepIso: 'yes' }).keepIso, false);
+    assert.equal(parseCreateUsbRequest({ ...base, keepIso: 1 }).keepIso, false);
+  });
+
   it('rejects non-https ISO URLs', () => {
     assert.throws(() => parseCreateUsbRequest({ ...base, iso: { ...base.iso, url: 'http://example.com/a.iso' } }), RequestValidationError);
   });

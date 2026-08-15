@@ -18,6 +18,8 @@ export function AgentPanel({
   onSelectDevice,
   requireRemovable,
   onRequireRemovableChange,
+  keepIso,
+  onKeepIsoChange,
 }: {
   state: AgentState;
   onConnected: (next: AgentState) => void;
@@ -25,6 +27,8 @@ export function AgentPanel({
   onSelectDevice: (id: string) => void;
   requireRemovable: boolean;
   onRequireRemovableChange: (value: boolean) => void;
+  keepIso: boolean;
+  onKeepIsoChange: (value: boolean) => void;
 }) {
   const [baseUrl, setBaseUrl] = useState(guessAgentUrl);
   const [code, setCode] = useState('');
@@ -164,6 +168,13 @@ npm run dev:agent`}</pre>
         onChange={onRequireRemovableChange}
         label="Only allow removable drives"
         description="Keep this on unless you know exactly what you are doing. The drive this computer boots from is always refused, whatever this is set to."
+      />
+
+      <Toggle
+        checked={keepIso}
+        onChange={onKeepIsoChange}
+        label="Keep the downloaded Windows ISO on this computer"
+        description="Off by default, so a borrowed or shared machine is left exactly as you found it. Turn it on to save the download and make a second stick without fetching 8.5 GB again."
       />
 
       {error ? <Banner tone="danger">{error}</Banner> : null}

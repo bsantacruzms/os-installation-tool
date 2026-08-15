@@ -59,6 +59,33 @@ localhost service.
 `packages/server` is optional. It exists for self-hosting the API and is not needed by the
 deployed site.
 
+## What it leaves behind
+
+Nothing, by default. The ISO is downloaded to `~/.osit/downloads`, used, and then deleted once
+the stick is built, so a borrowed or shared machine is left as it was found. A **failed** run
+keeps the partial file so the next attempt can resume instead of re-fetching 8.5 GB, and there
+is a toggle to keep a successful download if you plan to make more than one stick.
+
+The 8.5 GB has to pass through the computer either way. There is no route from Microsoft to a
+USB stick that avoids the machine the stick is plugged into, in this or any other tool.
+
+## Why this cannot be a pure web page
+
+Worth stating plainly, because it is the first thing everyone asks. Hosting the page anywhere
+else does not change any of it:
+
+- **Browsers cannot format or partition a drive.** No web API exposes raw block devices.
+  `showDirectoryPicker` writes files into an already-mounted volume; it cannot create a
+  filesystem or make a disk bootable. WebUSB exists but mass storage is on its blocklist, which
+  is exactly what stops any web page from wiping your disks.
+- **A browser cannot even fetch the ISO.** Microsoft's download host sends no
+  `Access-Control-Allow-Origin`, so the request is blocked by CORS. Proxying it would push
+  8.5 GB per user through the proxy.
+- **It would not fit.** Browser storage quota on a typical machine is around 7.5 GB, under the
+  size of the ISO.
+
+Hence the helper. It is small, it is auditable, and it only runs while you are using it.
+
 ## Requirements
 
 - Node.js 20.11 or newer.

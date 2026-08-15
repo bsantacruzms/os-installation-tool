@@ -110,6 +110,8 @@ export function parseCreateUsbRequest(body: unknown): CreateUsbRequest {
     volumeLabel: typeof raw['volumeLabel'] === 'string' ? raw['volumeLabel'].slice(0, 32) : 'WIN11',
     // Defaults to on: writing to a non-removable disk must be a deliberate choice.
     requireRemovable: raw['requireRemovable'] !== false,
+    // Defaults to off: leave no 8 GB souvenir on a machine that is not yours.
+    keepIso: raw['keepIso'] === true,
   };
 }
 

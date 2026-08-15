@@ -241,6 +241,12 @@ export interface CreateUsbRequest {
   volumeLabel: string;
   /** Fail instead of writing if the device does not look like removable media. */
   requireRemovable: boolean;
+  /**
+   * Keep the downloaded ISO on this computer afterwards. Off by default, so a
+   * borrowed machine is left as it was found. A failed run always keeps the
+   * partial file so the next attempt can resume it.
+   */
+  keepIso?: boolean;
 }
 
 export interface AgentInfo {
