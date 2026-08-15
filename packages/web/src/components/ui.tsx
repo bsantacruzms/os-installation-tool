@@ -1,9 +1,31 @@
 import type { ReactNode } from 'react';
 
-export function Card({ title, subtitle, children, tone }: { title?: string; subtitle?: ReactNode; children: ReactNode; tone?: 'default' | 'warning' | 'danger' }) {
+/** A title like "1. Your account" renders its number as a badge. */
+function splitStep(title: string): { step?: string; rest: string } {
+  const match = /^(\d+)\.\s+(.*)$/.exec(title);
+  return match?.[1] && match[2] ? { step: match[1], rest: match[2] } : { rest: title };
+}
+
+export function Card({
+  title,
+  subtitle,
+  children,
+  tone,
+}: {
+  title?: string;
+  subtitle?: ReactNode;
+  children: ReactNode;
+  tone?: 'default' | 'warning' | 'danger';
+}) {
+  const { step, rest } = splitStep(title ?? '');
   return (
     <section className={`card ${tone && tone !== 'default' ? `card--${tone}` : ''}`}>
-      {title ? <h2 className="card__title">{title}</h2> : null}
+      {title ? (
+        <h2 className="card__title">
+          {step ? <span className="card__step" aria-hidden="true">{step}</span> : null}
+          {rest}
+        </h2>
+      ) : null}
       {subtitle ? <p className="card__subtitle">{subtitle}</p> : null}
       {children}
     </section>

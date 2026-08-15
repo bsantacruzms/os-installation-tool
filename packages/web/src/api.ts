@@ -63,6 +63,7 @@ export interface AgentInfoResponse {
   platform: string;
   arch: string;
   elevated: boolean;
+  workDirectory: string;
   capabilities: Record<string, boolean>;
 }
 

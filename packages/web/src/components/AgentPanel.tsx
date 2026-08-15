@@ -174,8 +174,14 @@ npm run dev:agent`}</pre>
         checked={keepIso}
         onChange={onKeepIsoChange}
         label="Keep the downloaded Windows ISO on this computer"
-        description="Off by default, so a borrowed or shared machine is left exactly as you found it. Turn it on to save the download and make a second stick without fetching 8.5 GB again."
+        description="Off by default. The download goes to temporary space and is deleted when the job ends, whether it succeeds, fails or is cancelled. Turn this on only if you want to make a second stick without fetching 8.5 GB again."
       />
+
+      {!keepIso && state.info?.workDirectory ? (
+        <p className="muted">
+          Temporary space used during the build: <code>{state.info.workDirectory}</code>. Emptied afterwards.
+        </p>
+      ) : null}
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
       <Button onClick={() => void refreshDevices()} disabled={busy}>

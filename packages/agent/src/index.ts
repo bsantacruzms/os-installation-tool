@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,7 +17,9 @@ function envInt(name: string, fallback: number): number {
 
 const host = process.env['OSIT_AGENT_HOST'] ?? '127.0.0.1';
 const port = envInt('OSIT_AGENT_PORT', 5179);
-const workDirectory = process.env['OSIT_AGENT_WORKDIR'] ?? join(homedir(), '.osit', 'downloads');
+// Scratch space, not a library. The ISO is deleted when the job ends unless the
+// user asks to keep it, so this lives in the temp directory rather than $HOME.
+const workDirectory = process.env['OSIT_AGENT_WORKDIR'] ?? join(tmpdir(), 'osit-scratch');
 const pairingCode = process.env['OSIT_AGENT_CODE'] ?? generatePairingCode();
 
 await mkdir(workDirectory, { recursive: true });
@@ -42,7 +44,7 @@ console.log('');
 console.log('  OS Installation Tool: local agent');
 console.log('  ---------------------------------');
 console.log(`  Listening on   http://${host}:${port}`);
-console.log(`  Downloads      ${workDirectory}`);
+console.log(`  Scratch space  ${workDirectory} (emptied after each build)`);
 console.log(`  Platform       ${process.platform} ${process.arch}`);
 console.log('');
 console.log(`  Pairing code   ${pairingCode}`);

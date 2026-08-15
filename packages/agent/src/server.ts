@@ -109,7 +109,7 @@ export function createAgentServer(options: AgentServerOptions) {
 
     try {
       if (request.method === 'GET' && url.pathname === '/agent/info') {
-        json(response, 200, await describeAgent(options.version));
+        json(response, 200, await describeAgent(options.version, options.workDirectory));
         return;
       }
       if (request.method === 'GET' && url.pathname === '/agent/devices') {
@@ -223,7 +223,7 @@ export function createAgentServer(options: AgentServerOptions) {
   };
 }
 
-async function describeAgent(version: string): Promise<AgentInfo> {
+async function describeAgent(version: string, workDirectory: string): Promise<AgentInfo> {
   const capabilities: Record<string, boolean> = {};
   let elevated = false;
 
@@ -245,6 +245,7 @@ async function describeAgent(version: string): Promise<AgentInfo> {
     platform: process.platform,
     arch: process.arch,
     elevated,
+    workDirectory,
     capabilities: { ...capabilities, ready: prerequisites.ok },
   };
 }

@@ -87,11 +87,29 @@ export function App() {
   return (
     <main className="shell">
       <header className="header">
-        <h1>OS Installation Tool</h1>
+        <div className="header__mark" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M32 15v22" stroke="#fff" strokeWidth="5" strokeLinecap="round" />
+            <path d="M21 26 32 15l11 11" stroke="#fff" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+            <rect x="18" y="41" width="28" height="8" rx="4" fill="#fff" fillOpacity="0.92" />
+          </svg>
+        </div>
+        <h1>Bootable Windows 11, your way</h1>
         <p>
-          Build a bootable Windows 11 USB stick from Windows, macOS or Linux, with the account, the privacy settings and every
-          setup answer already filled in.
+          Build an installer USB from Windows, macOS or Linux with the account, the privacy settings and every setup answer
+          already filled in.
         </p>
+        <div className="pills">
+          <span className="pill">
+            <strong>Official</strong> ISO from Microsoft
+          </span>
+          <span className="pill">
+            <strong>No</strong> Microsoft account
+          </span>
+          <span className="pill">
+            <strong>Nothing</strong> left on your machine
+          </span>
+        </div>
       </header>
 
       {progress ? (
@@ -189,8 +207,23 @@ export function App() {
       <footer className="footer">
         <p>
           Windows is downloaded directly from Microsoft each time. This tool never mirrors, repackages or redistributes their
-          media, and it does not activate Windows.
+          media, and it does not activate Windows. The download is deleted from your computer when the job ends.
         </p>
+        <div className="footer__links">
+          <a href="https://github.com/bsantacruzms/os-installation-tool" target="_blank" rel="noreferrer noopener">
+            Source on GitHub
+          </a>
+          <a
+            href="https://github.com/bsantacruzms/os-installation-tool#why-this-cannot-be-a-pure-web-page"
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            Why a helper is needed
+          </a>
+          <a href="https://github.com/bsantacruzms/os-installation-tool/issues" target="_blank" rel="noreferrer noopener">
+            Report a problem
+          </a>
+        </div>
       </footer>
     </main>
   );

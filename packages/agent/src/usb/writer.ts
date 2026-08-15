@@ -139,60 +139,67 @@ export async function createBootableUsb(options: WriterOptions): Promise<void> {
   }
   throwIfCancelled();
 
-  // ---- Format -------------------------------------------------------------
-  beginPhase('partitioning', `Erasing ${device.description}`);
-  const target = await platform.partitionAndFormat(device, request.volumeLabel, events.onLog);
-  throwIfCancelled();
-
-  const iso = await platform.mountIso(isoPath, events.onLog);
-  try {
-    // ---- Copy -------------------------------------------------------------
-    const oversized = await findOversizedInstallImage(iso.path);
-    if (oversized) {
-      events.onLog(
-        `sources/${oversized.name} is ${(oversized.bytes / 1024 ** 3).toFixed(1)} GB, which FAT32 cannot store. It will be split.`,
-      );
+  // Whatever happens from here, a downloaded ISO is ours to clean up. Failures
+  // and cancellations included: the promise is that nothing is left behind.
+  const discardDownload = async () => {
+    if (isoSource.kind !== 'url') return;
+    if (request.keepIso) {
+      events.onLog(`Kept the downloaded ISO at ${isoPath} for next time.`);
+      return;
     }
-
-    beginPhase('extracting', 'Copying the installer files to the USB stick');
-    await platform.copyTree(iso.path, target.mountPath, oversized ? [oversized.name] : [], (fraction, message) =>
-      report('extracting', fraction, message),
-    );
-    throwIfCancelled();
-
-    // ---- Split ------------------------------------------------------------
-    if (oversized) {
-      beginPhase('splitting-wim', 'Splitting the Windows image so it fits on FAT32');
-      // 3800 MB keeps every chunk comfortably below the 4 GiB FAT32 limit.
-      await platform.splitImage(oversized.path, join(target.mountPath, 'sources'), 3800, (fraction, message) =>
-        report('splitting-wim', fraction, message),
-      );
-      throwIfCancelled();
-    }
-
-    // ---- Inject -----------------------------------------------------------
-    beginPhase('injecting', 'Applying your settings to the USB stick');
-    const applied = await applyPlan(target.mountPath, request.plan, events.onLog);
-    report('injecting', 1, `Wrote ${applied.written.length} files, removed ${applied.removed.length}`);
-  } finally {
-    await iso.unmount().catch((error: unknown) => events.onLog(`Could not unmount the ISO: ${String(error)}`));
-  }
-
-  // ---- Finish -------------------------------------------------------------
-  beginPhase('finalizing', 'Finishing up');
-  await platform.finish(target, device, events.onLog);
-
-  // Only a downloaded ISO is ours to delete, and only once the stick is built.
-  if (isoSource.kind === 'url' && !request.keepIso) {
     try {
       await rm(isoPath, { force: true });
-      events.onLog(`Deleted ${isoPath}. Nothing from this build is left on the computer.`);
+      events.onLog(`Deleted ${isoPath}. Nothing from this build is left on this computer.`);
     } catch (error) {
       events.onLog(`Could not delete the downloaded ISO at ${isoPath}: ${String(error)}`);
     }
-  } else if (isoSource.kind === 'url') {
-    events.onLog(`Kept the downloaded ISO at ${isoPath} for next time.`);
-  }
+  };
 
-  report('finalizing', 1, 'Done');
+  try {
+    // ---- Format -----------------------------------------------------------
+    beginPhase('partitioning', `Erasing ${device.description}`);
+    const target = await platform.partitionAndFormat(device, request.volumeLabel, events.onLog);
+    throwIfCancelled();
+
+    const iso = await platform.mountIso(isoPath, events.onLog);
+    try {
+      // ---- Copy -----------------------------------------------------------
+      const oversized = await findOversizedInstallImage(iso.path);
+      if (oversized) {
+        events.onLog(
+          `sources/${oversized.name} is ${(oversized.bytes / 1024 ** 3).toFixed(1)} GB, which FAT32 cannot store. It will be split.`,
+        );
+      }
+
+      beginPhase('extracting', 'Copying the installer files to the USB stick');
+      await platform.copyTree(iso.path, target.mountPath, oversized ? [oversized.name] : [], (fraction, message) =>
+        report('extracting', fraction, message),
+      );
+      throwIfCancelled();
+
+      // ---- Split ----------------------------------------------------------
+      if (oversized) {
+        beginPhase('splitting-wim', 'Splitting the Windows image so it fits on FAT32');
+        // 3800 MB keeps every chunk comfortably below the 4 GiB FAT32 limit.
+        await platform.splitImage(oversized.path, join(target.mountPath, 'sources'), 3800, (fraction, message) =>
+          report('splitting-wim', fraction, message),
+        );
+        throwIfCancelled();
+      }
+
+      // ---- Inject ---------------------------------------------------------
+      beginPhase('injecting', 'Applying your settings to the USB stick');
+      const applied = await applyPlan(target.mountPath, request.plan, events.onLog);
+      report('injecting', 1, `Wrote ${applied.written.length} files, removed ${applied.removed.length}`);
+    } finally {
+      await iso.unmount().catch((error: unknown) => events.onLog(`Could not unmount the ISO: ${String(error)}`));
+    }
+
+    // ---- Finish -----------------------------------------------------------
+    beginPhase('finalizing', 'Finishing up');
+    await platform.finish(target, device, events.onLog);
+    report('finalizing', 1, 'Done');
+  } finally {
+    await discardDownload();
+  }
 }

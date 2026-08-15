@@ -255,6 +255,8 @@ export interface AgentInfo {
   platform: string;
   arch: string;
   elevated: boolean;
+  /** Temporary space used during a build, emptied when the job ends. */
+  workDirectory: string;
   /** External binaries the agent found, keyed by tool name. */
   capabilities: Record<string, boolean>;
 }
