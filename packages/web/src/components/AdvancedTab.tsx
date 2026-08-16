@@ -51,9 +51,21 @@ export function AdvancedTab({
                 draft.image.edition = { kind: 'ask-at-install' };
               })
             }
-            options={catalog.images.map((image) => ({ value: image.id, label: image.name }))}
+            options={catalog.images.map((image) => ({
+              value: image.id,
+              // Only the consumer ISO can be resolved automatically so far.
+              // Listing the rest as choosable would silently fetch the wrong one.
+              label: image.source === 'microsoft-download-api' ? image.name : `${image.name} - not supported yet`,
+              disabled: image.source !== 'microsoft-download-api',
+            }))}
           />
         </Field>
+        {variant && variant.source !== 'microsoft-download-api' ? (
+          <Banner tone="warning" title="Not wired up yet">
+            This image cannot be fetched automatically. Microsoft puts the evaluation builds behind a registration form, and
+            choosing your own ISO needs a file picker that does not exist yet. Only the consumer ISO works today.
+          </Banner>
+        ) : null}
         {variant ? <p className="muted">{variant.description}</p> : null}
         {variant?.notes?.map((note) => (
           <Banner key={note} tone="info">
