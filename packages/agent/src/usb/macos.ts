@@ -23,6 +23,10 @@ export class MacUsbPlatform implements UsbPlatform {
         hint: 'Needed to split install.wim so it fits on FAT32. Install it with: brew install wimlib',
       });
     }
+    // Checked up front so a large download is not wasted.
+    if (process.getuid?.() !== 0) {
+      missing.push({ tool: 'root privileges', hint: 'Erasing a disk needs root. Start the helper with sudo.' });
+    }
     return { ok: missing.length === 0, missing };
   }
 

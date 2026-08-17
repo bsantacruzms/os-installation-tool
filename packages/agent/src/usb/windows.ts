@@ -33,6 +33,14 @@ export class WindowsUsbPlatform implements UsbPlatform {
     if (!(await commandExists('dism.exe', ['/?']))) {
       missing.push({ tool: 'dism.exe', hint: 'DISM ships with Windows and is needed to split install.wim for FAT32.' });
     }
+    // Checked here rather than at partition time, so an 8 GB download is not
+    // wasted before discovering the helper cannot touch a disk.
+    if (!(await isWindowsElevated())) {
+      missing.push({
+        tool: 'Administrator rights',
+        hint: 'Close the helper, right click it and choose "Run as administrator", then reconnect. Windows will not let anything erase a disk otherwise.',
+      });
+    }
     return { ok: missing.length === 0, missing };
   }
 
@@ -67,7 +75,17 @@ $boot = Get-Partition -DiskNumber $n -PartitionNumber $boot.PartitionNumber
 ConvertTo-Json -InputObject ([pscustomobject]@{ letter = [string]$boot.DriveLetter })
 `;
 
-    const result = await ps<{ letter?: string }>(script);
+    const result = await ps<{ letter?: string }>(script).catch((error: unknown) => {
+      const text = error instanceof Error ? error.message : String(error);
+      // PowerShell reports a missing elevation token as a CIM access failure.
+      if (/CIM resource|PermissionDenied|Access is denied/i.test(text)) {
+        throw new Error(
+          'Windows refused to erase the disk because the helper is not running as administrator. ' +
+            'Close it, right click it and choose "Run as administrator", then try again.',
+        );
+      }
+      throw error;
+    });
     const letter = (result.letter ?? '').trim();
     if (letter.length === 0) {
       throw new Error('The USB stick was formatted but Windows did not assign it a drive letter.');

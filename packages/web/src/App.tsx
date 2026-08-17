@@ -46,7 +46,10 @@ export function App() {
 
   const selectedDevice = useMemo(() => agent.devices.find((device) => device.id === deviceId), [agent.devices, deviceId]);
   const blocking = issues.filter((issue) => issue.severity === 'error');
-  const readyToCreate = Boolean(config && plan && agent.client && selectedDevice && blocking.length === 0);
+  // Without elevation the build always dies at the partition step, so do not
+  // let it start and waste an 8 GB download first.
+  const elevated = agent.info?.elevated !== false;
+  const readyToCreate = Boolean(config && plan && agent.client && selectedDevice && elevated && blocking.length === 0);
 
   const start = useCallback(async () => {
     if (!config || !plan || !agent.client || !selectedDevice) return;
@@ -181,6 +184,12 @@ export function App() {
             ) : null}
             {!agent.client ? <p className="muted">Connect the helper above to pick a USB stick.</p> : null}
             {agent.client && !selectedDevice ? <p className="muted">Select the USB stick you want to erase.</p> : null}
+            {agent.client && !elevated ? (
+              <Banner tone="danger" title="The helper needs administrator rights">
+                Windows will not let anything erase a disk otherwise, and the build would fail after downloading 8 GB. Close
+                the helper, right click it and choose "Run as administrator", then connect again.
+              </Banner>
+            ) : null}
             {startError ? <Banner tone="danger">{startError}</Banner> : null}
 
             {confirming ? (
