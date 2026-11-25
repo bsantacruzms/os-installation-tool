@@ -143,7 +143,8 @@ export class AgentClient {
     const source = new EventSource(url);
     source.onmessage = (event) => {
       try {
-        const message = JSON.parse(String(event.data)) as { type: string; progress?: JobProgress; message?: string };
+        const message = JSON.parse(String(event.data)) as { type: string; progress?: JobProgress; jobs?: JobProgress[]; message?: string };
+        if (message.type === 'hello') message.jobs?.forEach(onProgress);
         if (message.type === 'progress' && message.progress) onProgress(message.progress);
         if (message.type === 'log' && message.message) onLog(message.message);
       } catch {

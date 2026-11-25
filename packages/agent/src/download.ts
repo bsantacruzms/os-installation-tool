@@ -16,6 +16,7 @@ export interface DownloadOptions {
   url: string;
   destination: string;
   sha256?: string;
+  httpsOnly?: boolean;
   signal?: AbortSignal;
   onProgress?: (progress: DownloadProgress) => void;
 }
@@ -40,7 +41,17 @@ export async function downloadFile(options: DownloadOptions): Promise<{ path: st
   const headers: Record<string, string> = {};
   if (existing > 0) headers['Range'] = `bytes=${existing}-`;
 
-  const response = await fetch(options.url, { headers, signal: options.signal });
+  let url = new URL(options.url);
+  let response: Response;
+  for (let hops = 0;; hops++) {
+    if (options.httpsOnly && (url.protocol !== 'https:' || hops > 8)) throw new Error('Refusing an insecure or excessive ISO redirect.');
+    response = await fetch(url, { headers, signal: options.signal, redirect: options.httpsOnly ? 'manual' : 'follow' });
+    if (!options.httpsOnly || ![301, 302, 303, 307, 308].includes(response.status)) break;
+    await response.body?.cancel();
+    const location = response.headers.get('location');
+    if (!location) throw new Error('ISO redirect has no destination.');
+    url = new URL(location, url);
+  }
 
   if (existing > 0 && response.status === 416) {
     // The server says there is nothing left to send, so the file is complete.

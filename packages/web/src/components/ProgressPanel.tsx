@@ -4,8 +4,9 @@ import { Banner, Button, Card } from './ui.tsx';
 
 const PHASE_LABELS: Record<string, string> = {
   queued: 'Waiting to start',
-  downloading: 'Downloading Windows from Microsoft',
-  verifying: 'Checking the download',
+  downloading: 'Downloading the official image',
+  verifying: 'Checking the image',
+  imaging: 'Writing the bootable disk image',
   partitioning: 'Erasing and formatting the USB stick',
   extracting: 'Copying the installer files',
   'splitting-wim': 'Splitting the Windows image for FAT32',
@@ -21,7 +22,7 @@ export function PlanSummary({ plan, device }: { plan: BuildPlan; device?: UsbDev
     <Card title="What this USB stick will do">
       {device ? (
         <Banner tone="danger" title="Everything on this drive will be erased">
-          {device.description} ({formatBytes(device.sizeBytes)}) will be wiped and rebuilt as a Windows 11 installer.
+          {device.description} ({formatBytes(device.sizeBytes)}, {device.id}) will be erased and replaced with the selected image.
         </Banner>
       ) : null}
 

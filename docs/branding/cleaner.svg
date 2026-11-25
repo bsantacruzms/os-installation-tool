@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Cl: Windows Cleaner">
+  <rect x="2" y="2" width="60" height="60" rx="13" fill="#10362f"/>
+  <path d="M12 15V11H26" fill="none" stroke="#50dcab" stroke-width="3"/>
+  <g fill="none" stroke="#aeffdb" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M34 26c-3-4-8-5-13-3-6 2-9 8-8 14s5 10 11 10c5 0 8-2 10-5"/>
+    <path d="M43 22v20q0 5 6 5"/>
+  </g>
+</svg>

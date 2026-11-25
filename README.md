@@ -1,16 +1,55 @@
 # OS Installation Tool
 
-Create a bootable **Windows 11** USB stick from Windows, macOS or Linux, with the local
-account, the privacy settings and every setup answer already filled in.
+Create a bootable **Linux** or **Windows 11** USB stick from Windows, macOS or Linux.
+Windows media can include your local account, privacy settings and setup answers.
 
 Two tabs:
 
 - **Easy** answers four questions and uses safe defaults for everything else.
 - **Advanced** exposes every option, including the destructive ones.
 
-Linux distributions are next; the catalog and plan model are already family-aware.
+### Creating a Linux USB
 
-## What it actually does
+**Windows desktop:** Double-click `OS-Installation-Tool.exe` and approve the Windows
+administrator prompt. The portable app opens its own window with the USB writer
+already connected; no browser, pairing code or installation is needed. Choose an
+image and drive, review the erase warning, and confirm. The separate `osit-agent.exe`
+is still available for the browser-based workflow.
+
+The desktop setup screen keeps image selection, target, download retention and the
+Create button together. Open **Windows settings** for account, edition and privacy
+controls, **ISO options** for an existing Linux ISO, or **Review build plan** to
+inspect the steps before confirming. Detailed dialogs can scroll independently;
+press **Done** or **Esc** to return without losing your settings.
+See the [tool family icon guide](docs/branding/README.md) for the editable artwork.
+
+To build the desktop executable on Windows after building `packages/web`, run
+`npm --prefix packages/desktop ci` and `npm --prefix packages/desktop run build`.
+The portable x64 executable is written to `packages/desktop/dist/`.
+
+Select **Linux (x86-64)** and choose Ubuntu Desktop, Ubuntu Server, Linux Mint,
+Fedora Workstation, Debian Live or Kali Installer. The helper downloads the selected
+release through its official channel (including project-directed HTTPS mirrors), or
+accepts a full path to a local copy of that exact ISO. It checks the published,
+pinned SHA-256 before erasing anything. Only removable USB/SD drives are eligible.
+The helper writes the whole image and verifies it by reading it back. Windows setup
+files, FAT32 formatting and WIM tools are not used for Linux builds.
+
+The portable Windows helper is a single executable. Run it as Administrator, open
+`http://127.0.0.1:5179`, choose an image and settings, then confirm **Create USB**.
+Only then does it download the ISO to that PC. No installer, WSL, Node.js installation
+or extra packages are needed. It creates standard media without persistence.
+
+Desktop images let you try Linux without installing. Ubuntu Server and Kali Installer
+start an installer instead. On Linux and macOS hosts, **Keep live-session changes** for Ubuntu Desktop adds
+a 1 GiB unencrypted ext4 partition. This option requires `xorriso` and `mke2fs`
+(e2fsprogs) on PATH.
+Allow room for the downloaded ISO, a second image and the persistence partition
+on the helper host. Select the USB in the test PC's one-time boot menu, choose
+**Try Ubuntu**, save a file in your home folder and boot from the same USB again
+to check persistence. Do not start the installer for this test.
+
+## How Windows media is built
 
 1. Resolves the latest official Windows 11 ISO link from Microsoft's own download service.
 2. Downloads it (resumable) to your machine. Nothing is mirrored, repackaged or redistributed.

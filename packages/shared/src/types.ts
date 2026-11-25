@@ -209,6 +209,7 @@ export type JobPhase =
   | 'queued'
   | 'downloading'
   | 'verifying'
+  | 'imaging'
   | 'partitioning'
   | 'extracting'
   | 'splitting-wim'
@@ -234,6 +235,7 @@ export interface JobProgress {
 }
 
 export interface CreateUsbRequest {
+  linux?: { imageId: string; persistent: boolean; targetBytes: number; targetName: string };
   deviceId: string;
   /** Resolved ISO to download, or a path to a local ISO. */
   iso: { kind: 'url'; url: string; fileName: string; sizeBytes?: number; sha256?: string } | { kind: 'local'; path: string };

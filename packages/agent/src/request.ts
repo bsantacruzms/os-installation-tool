@@ -1,4 +1,5 @@
 import type { BuildPlan, CreateUsbRequest, FileEncoding, InjectedFile, RemovedPath } from '../../shared/src/types.js';
+import { findLinuxImage } from '../../shared/src/linux/catalog.js';
 
 export class RequestValidationError extends Error {
   constructor(message: string) {
@@ -90,6 +91,30 @@ function parsePlan(value: unknown): BuildPlan {
 
 export function parseCreateUsbRequest(body: unknown): CreateUsbRequest {
   const raw = record(body);
+  if (raw['family'] === 'linux') {
+    const image = findLinuxImage(requiredString(raw['imageId'], 'imageId', 80));
+    if (!image || raw['iso'] !== undefined || raw['plan'] !== undefined)
+      throw new RequestValidationError('Select an official Linux image from the catalog.');
+    const persistent = raw['persistent'];
+    if (persistent === true && process.platform === 'win32')
+      throw new RequestValidationError('Persistence is not supported by the portable Windows helper. Choose a standard Linux USB.');
+    if (typeof persistent !== 'boolean' || (persistent && image.id !== 'ubuntu-desktop'))
+      throw new RequestValidationError('Persistence is available only for Ubuntu Desktop.');
+    const targetBytes = raw['targetBytes'];
+    if (typeof targetBytes !== 'number' || !Number.isSafeInteger(targetBytes) || targetBytes <= 0)
+      throw new RequestValidationError('Confirm the USB drive and its capacity.');
+    return {
+      linux: { imageId: image.id, persistent, targetBytes, targetName: requiredString(raw['targetName'], 'targetName', 512) },
+      deviceId: requiredString(raw['deviceId'], 'deviceId', 512),
+      iso: raw['localPath'] === undefined
+        ? { kind: 'url', url: image.url, fileName: image.fileName, sha256: image.sha256 }
+        : { kind: 'local', path: requiredString(raw['localPath'], 'localPath', 4096) },
+      plan: { summary: [], bootSteps: [], warnings: [], injectedFiles: [], removedPaths: [] },
+      volumeLabel: '', requireRemovable: true, keepIso: raw['keepIso'] === true,
+    };
+  }
+  if (raw['family'] !== undefined && raw['family'] !== 'windows')
+    throw new RequestValidationError('Unknown operating system family.');
   const iso = record(raw['iso']);
 
   const parsedIso: CreateUsbRequest['iso'] =

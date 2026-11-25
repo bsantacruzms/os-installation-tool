@@ -217,9 +217,18 @@ export function createAgentServer(options: AgentServerOptions) {
 
   return {
     jobs,
+    get port(): number {
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('Helper is not listening on TCP.');
+      return address.port;
+    },
     listen: () =>
-      new Promise<void>((resolve) => {
-        server.listen(options.port, options.host, resolve);
+      new Promise<void>((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(options.port, options.host, () => {
+          server.off('error', reject);
+          resolve();
+        });
       }),
     close: async () => {
       for (const listener of listeners) listener.end();
@@ -251,6 +260,6 @@ async function describeAgent(version: string, workDirectory: string): Promise<Ag
     arch: process.arch,
     elevated,
     workDirectory,
-    capabilities: { ...capabilities, ready: prerequisites.ok },
+    capabilities: { ...capabilities, ready: prerequisites.ok, linuxImaging: true, ubuntuPersistence: process.platform !== 'win32' },
   };
 }

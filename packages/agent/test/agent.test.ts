@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, open, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -14,6 +15,47 @@ import { applyPlan, resolveWithinRoot, UnsafePathError } from '../src/usb/apply.
 import { partitionPath } from '../src/usb/linux.js';
 import { sanitizeVolumeLabel } from '../src/usb/platform.js';
 import type { UsbDevice } from '../../shared/src/types.js';
+import { checkLinuxTarget, writeAndVerifyImage } from '../src/usb/raw-image.js';
+import { enableCasperPersistence } from '../src/usb/ubuntu-persistence.js';
+
+describe('Linux imaging', () => {
+  const body = { family: 'linux', imageId: 'ubuntu-desktop', persistent: false, targetName: 'USB', targetBytes: 10000, deviceId: '/dev/sdb' };
+  it('derives the source in the helper and refuses incompatible options or replacement devices', () => {
+    const job = parseCreateUsbRequest(body);
+    assert.equal(job.iso.kind, 'url');
+    assert.throws(() => parseCreateUsbRequest({ ...body, iso: { url: 'https://example.org/fake.iso' } }), /official/);
+    assert.throws(() => parseCreateUsbRequest({ ...body, imageId: 'ubuntu-server', persistent: true }), /Persistence/);
+    if (process.platform === 'win32')
+      assert.throws(() => parseCreateUsbRequest({ ...body, persistent: true }), /portable Windows helper/);
+    else assert.equal(parseCreateUsbRequest({ ...body, persistent: true }).linux?.persistent, true);
+    assert.throws(() => checkLinuxTarget({ id: body.deviceId, bus: 'usb', removable: true, isSystem: false, mountPoints: [],
+      description: 'Replacement', sizeBytes: body.targetBytes }, job.linux!), /no longer matches/);
+  });
+  it('only modifies Casper kernel lines and rejects unknown boot layouts', () => {
+    assert.equal(enableCasperPersistence(' linux /casper/vmlinuz ---\ninitrd /casper/initrd'), ' linux /casper/vmlinuz persistent ---\ninitrd /casper/initrd');
+    assert.throws(() => enableCasperPersistence('linux /boot/vmlinuz'), /unrecognized/);
+  });
+  it('checks capacity and cancellation before erasing; writes and verifies a multi-chunk image', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'osit-raw-test-'));
+    const bytes = Buffer.alloc(5 * 1024 * 1024 + 512, 0x95);
+    bytes[0] = 0xb2;
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    const source = await open(join(dir, 'source'), 'wx+');
+    const target = await open(join(dir, 'target'), 'wx+');
+    const signal = new AbortController().signal;
+    try {
+      await source.writeFile(bytes);
+      await assert.rejects(writeAndVerifyImage(source, target, bytes.length, 512, hash, signal, () => {}), /too large/);
+      await assert.rejects(writeAndVerifyImage(source, target, bytes.length, bytes.length, hash, AbortSignal.abort(), () => {}));
+      assert.equal((await target.stat()).size, 0);
+      await writeAndVerifyImage(source, target, bytes.length, bytes.length, hash, signal, () => {});
+      await assert.rejects(writeAndVerifyImage(source, target, bytes.length, bytes.length, 'bad digest', signal, () => {}), /read-back/);
+    } finally {
+      await Promise.all([source.close(), target.close()]);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('windows disk parsing', () => {
   const payload = {

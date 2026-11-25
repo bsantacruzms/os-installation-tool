@@ -1,6 +1,7 @@
 export * from './types.js';
 export * from './xml.js';
 export * from './cache.js';
+export * from './linux/catalog.js';
 export * from './windows/catalog.js';
 export * from './windows/defaults.js';
 export * from './windows/editions.js';

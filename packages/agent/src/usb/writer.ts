@@ -9,6 +9,7 @@ import { LinuxUsbPlatform } from './linux.js';
 import { MacUsbPlatform } from './macos.js';
 import { FAT32_MAX_FILE_BYTES, type UsbPlatform } from './platform.js';
 import { WindowsUsbPlatform } from './windows.js';
+import { createLinuxUsb } from './raw-image.js';
 
 export function createPlatform(platform: NodeJS.Platform = process.platform): UsbPlatform {
   switch (platform) {
@@ -80,6 +81,7 @@ export async function findOversizedInstallImage(isoRoot: string): Promise<{ path
 
 export async function createBootableUsb(options: WriterOptions): Promise<void> {
   const { request, events, signal } = options;
+  if (request.linux) return createLinuxUsb(options, request.linux);
   const platform = options.platform ?? createPlatform();
 
   const weights = request.iso.kind === 'url' ? WEIGHTS_WITH_DOWNLOAD : WEIGHTS_LOCAL_ISO;

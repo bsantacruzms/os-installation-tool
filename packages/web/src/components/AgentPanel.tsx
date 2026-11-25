@@ -43,10 +43,11 @@ function detectPlatform(): string {
  * Asks GitHub which binaries actually exist, so a platform whose runner was
  * unavailable is hidden rather than offered as a dead link.
  */
-function useAvailableDownloads(): HelperDownload[] {
+function useAvailableDownloads(desktop: boolean): HelperDownload[] {
   const [available, setAvailable] = useState<HelperDownload[] | null>(null);
 
   useEffect(() => {
+    if (desktop) return;
     let cancelled = false;
     fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('no release'))))
@@ -60,7 +61,7 @@ function useAvailableDownloads(): HelperDownload[] {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [desktop]);
 
   // Before the answer arrives, show everything rather than an empty panel.
   return available ?? HELPER_DOWNLOADS;
@@ -75,6 +76,7 @@ export function AgentPanel({
   onRequireRemovableChange,
   keepIso,
   onKeepIsoChange,
+  removableOnly = false,
 }: {
   state: AgentState;
   onConnected: (next: AgentState) => void;
@@ -84,16 +86,19 @@ export function AgentPanel({
   onRequireRemovableChange: (value: boolean) => void;
   keepIso: boolean;
   onKeepIsoChange: (value: boolean) => void;
+  removableOnly?: boolean;
 }) {
-  const [baseUrl, setBaseUrl] = useState(guessAgentUrl);
+  const desktop = location.hostname === '127.0.0.1' && location.hash === '#desktop';
+  const [baseUrl, setBaseUrl] = useState(() => desktop ? location.origin : guessAgentUrl());
   const [code, setCode] = useState('');
   const [status, setStatus] = useState<'idle' | 'checking' | 'found' | 'missing'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const detectedPlatform = detectPlatform();
-  const downloads = useAvailableDownloads();
+  const downloads = useAvailableDownloads(desktop);
 
   useEffect(() => {
+    if (desktop) return;
     let cancelled = false;
     setStatus('checking');
     // The helper may be started while this page is open, so keep looking.
@@ -108,7 +113,7 @@ export function AgentPanel({
       cancelled = true;
       clearInterval(timer);
     };
-  }, [baseUrl]);
+  }, [baseUrl, desktop]);
 
   const connect = useCallback(async () => {
     setBusy(true);
@@ -124,6 +129,10 @@ export function AgentPanel({
     }
   }, [baseUrl, code, onConnected]);
 
+  useEffect(() => {
+    if (desktop && !state.client) void connect();
+  }, [desktop, state.client, connect]);
+
   const refreshDevices = useCallback(async () => {
     if (!state.client) return;
     setBusy(true);
@@ -137,6 +146,10 @@ export function AgentPanel({
   }, [onConnected, state]);
 
   if (!state.client) {
+    if (desktop) return <Card title="USB drive">
+      {error ? <><Banner tone="danger">{error}</Banner><Button onClick={() => void connect()} disabled={busy}>Retry</Button></> :
+        <p>Checking this computer for USB drives...</p>}
+    </Card>;
     return (
       <Card
         title="Connect this computer"
@@ -190,6 +203,23 @@ export function AgentPanel({
   }
 
   const usable = state.devices.filter((device) => !device.isSystem);
+  const blockedDevice = (d: UsbDevice) => (requireRemovable && !d.removable) || (removableOnly && !['usb', 'sd'].includes(d.bus));
+  if (desktop) return <Card title="Target USB">
+    <div className="drive-picker">
+      <Field label="Drive to erase"><select className="input" value={selectedDeviceId} onChange={event => onSelectDevice(event.target.value)}>
+        <option value="">Select a drive...</option>
+        {usable.map(d => <option key={d.id} value={d.id} disabled={blockedDevice(d)}>
+          {d.description} · {formatBytes(d.sizeBytes)} · {d.mountPoints.join(' ') || d.id}
+        </option>)}
+      </select></Field>
+      <Button onClick={() => void refreshDevices()} disabled={busy}>{busy ? 'Refreshing...' : 'Refresh drive list'}</Button>
+    </div>
+    <div className="drive-options">
+      <Toggle checked={requireRemovable} disabled={removableOnly} onChange={onRequireRemovableChange} label="Removable drives only" />
+      <Toggle checked={keepIso} onChange={onKeepIsoChange} label="Keep downloaded ISO" />
+    </div>
+    {error && <Banner tone="danger">{error}</Banner>}
+  </Card>;
 
   return (
     <Card
@@ -208,7 +238,7 @@ export function AgentPanel({
       ) : (
         <ul className="devices">
           {usable.map((device) => {
-            const blocked = requireRemovable && !device.removable;
+            const blocked = blockedDevice(device);
             return (
             <li key={device.id}>
               <label className={`device ${selectedDeviceId === device.id ? 'device--selected' : ''} ${blocked ? 'device--blocked' : ''}`}>
@@ -238,6 +268,7 @@ export function AgentPanel({
 
       <Toggle
         checked={requireRemovable}
+        disabled={removableOnly}
         onChange={onRequireRemovableChange}
         label="Only allow removable drives"
         description="Keep this on unless you know exactly what you are doing. The drive this computer boots from is always refused, whatever this is set to."
@@ -246,8 +277,8 @@ export function AgentPanel({
       <Toggle
         checked={keepIso}
         onChange={onKeepIsoChange}
-        label="Keep the downloaded Windows ISO on this computer"
-        description="Off by default. The download goes to temporary space and is deleted when the job ends, whether it succeeds, fails or is cancelled. Turn this on only if you want to make a second stick without fetching 8.5 GB again."
+        label="Keep the downloaded ISO on this computer"
+        description="Keep a copy of the official download after the USB is built."
       />
 
       {!keepIso && state.info?.workDirectory ? (
