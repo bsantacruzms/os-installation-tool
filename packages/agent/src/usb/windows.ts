@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { UsbDevice } from '../../../shared/src/types.js';
 import { commandExists, powershellJson, run, runStreaming } from '../process.js';
 import { windowsDiskNumber } from '../devices/windows.js';
+import { prepareClearedGpt } from './windows-gpt.js';
 import {
   sanitizeVolumeLabel,
   WINDOWS_FAT32_MAX_MB,
@@ -63,8 +64,10 @@ export class WindowsUsbPlatform implements UsbPlatform {
 $ErrorActionPreference = 'Stop'
 $n = ${diskNumber}
 Get-Disk -Number $n | Set-Disk -IsReadOnly $false -ErrorAction SilentlyContinue
-Get-Disk -Number $n | Clear-Disk -RemoveData -RemoveOEM -Confirm:$false
-Initialize-Disk -Number $n -PartitionStyle GPT -ErrorAction SilentlyContinue
+$disk = Get-Disk -Number $n
+if ($disk.IsBoot -or $disk.IsSystem) { throw 'Refusing to erase a system drive.' }
+if ($disk.PartitionStyle -ne 'RAW') { $disk | Clear-Disk -RemoveData -RemoveOEM -Confirm:$false }
+${prepareClearedGpt}
 $boot = New-Partition -DiskNumber $n -Size ${bootMb}MB -AssignDriveLetter
 Format-Volume -Partition $boot -FileSystem FAT32 -NewFileSystemLabel '${volumeLabel}' -Force -Confirm:$false | Out-Null
 ${dataMb > 1024

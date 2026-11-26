@@ -128,7 +128,8 @@ describe('SetupComplete.cmd', () => {
     const script = buildSetupCompleteScript(config());
     assert.match(script, /DataCollection.*AllowTelemetry/);
     assert.match(script, /AdvertisingInfo.*DisabledByGroupPolicy/);
-    assert.match(script, /TurnOffWindowsCopilot/);
+    assert.match(script, /WindowsAI.*DisableAIDataAnalysis/);
+    assert.match(script, /WindowsAI.*AllowRecallEnablement/);
   });
 
   it('skips privacy work entirely when every tweak is off', () => {

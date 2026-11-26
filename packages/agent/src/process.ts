@@ -38,7 +38,7 @@ export function run(command: string, args: string[], options: SpawnOptions = {})
 
 export async function runOrThrow(command: string, args: string[], options: SpawnOptions = {}): Promise<RunResult> {
   const result = await run(command, args, options);
-  if (result.code !== 0) throw new CommandError([command, ...args].join(' '), result);
+  if (result.code !== 0) throw new CommandError(command, result);
   return result;
 }
 

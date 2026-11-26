@@ -114,7 +114,8 @@ export class JobManager extends EventEmitter {
       job.progress = {
         ...job.progress,
         phase: cancelled ? 'cancelled' : 'failed',
-        message: cancelled ? 'Cancelled. The USB stick has been left partly written and is not bootable.' : message,
+        stoppedDuring: job.progress.phase,
+        message: cancelled ? 'Cancelled before completion.' : message,
         ...(cancelled ? {} : { error: message }),
       };
       this.appendLog(job, cancelled ? 'Cancelled by the user.' : `Failed: ${message}`);

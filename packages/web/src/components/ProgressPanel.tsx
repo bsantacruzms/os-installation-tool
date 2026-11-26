@@ -100,11 +100,11 @@ export function ProgressPanel({
           style={{ width: `${percent}%` }}
         />
       </div>
-      <p className="progress__label">
+      {!finished && <p className="progress__label">
         {percent}% · {progress.message}
-      </p>
+      </p>}
 
-      {progress.bytesTotal ? (
+      {!finished && progress.phase === 'downloading' && progress.bytesTotal ? (
         <p className="muted">
           {formatBytes(progress.bytesDone ?? 0)} of {formatBytes(progress.bytesTotal)}
           {progress.bytesPerSecond ? ` · ${formatRate(progress.bytesPerSecond)}` : ''}
@@ -122,13 +122,14 @@ export function ProgressPanel({
         </Banner>
       ) : null}
       {progress.error ? (
-        <Banner tone="danger" title="It did not work">
+        <Banner tone="danger" title={progress.stoppedDuring ? `Failed during: ${PHASE_LABELS[progress.stoppedDuring] ?? progress.stoppedDuring}` : 'USB creation failed'}>
           {progress.error}
         </Banner>
       ) : null}
       {progress.phase === 'cancelled' ? (
         <Banner tone="warning">
-          The stick was left half written and will not boot. Run the job again to rebuild it from scratch.
+          {progress.stoppedDuring && `Stopped during: ${PHASE_LABELS[progress.stoppedDuring] ?? progress.stoppedDuring}. `}
+          If writing had started, rebuild the USB before trying to boot from it.
         </Banner>
       ) : null}
 

@@ -99,7 +99,7 @@ export function EasyTab({
             })
           }
           label={`Apply the ${recommendedPrivacyTweakIds.length} recommended privacy settings`}
-          description="Telemetry down to the minimum, no advertising ID, no Copilot or Recall, no web results in Start, location denied by default."
+          description="Telemetry down to the minimum, no advertising ID or Recall snapshots, no web results in Start, location denied by default."
         />
 
         <Details summary="See exactly what changes">

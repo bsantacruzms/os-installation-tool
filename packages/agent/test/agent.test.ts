@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, open, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, parse, relative } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { assertSafeTarget, findDevice } from '../src/devices/index.js';
@@ -17,9 +17,90 @@ import { sanitizeVolumeLabel } from '../src/usb/platform.js';
 import type { UsbDevice } from '../../shared/src/types.js';
 import { checkLinuxTarget, writeAndVerifyImage } from '../src/usb/raw-image.js';
 import { enableCasperPersistence } from '../src/usb/ubuntu-persistence.js';
+import { inspectUbuntuTree, copyUbuntuTree } from '../src/usb/ubuntu-iso.js';
+import { prepareClearedGpt } from '../src/usb/windows-gpt.js';
+import { copySignedBootFiles } from '../src/usb/signed-grub.js';
+import { runOrThrow } from '../src/process.js';
+
+it('prepares cleared RAW, GPT and MBR targets without masking storage failures', { skip: process.platform !== 'win32' }, async () => {
+  // All storage commands are shadowed; no real disks are queried or modified.
+  await runOrThrow('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `
+$ErrorActionPreference = 'Stop'
+function Get-Disk($Path) { return $disk }
+function Initialize-Disk($Path, $PartitionStyle) {
+  $calls.Add('init')
+  if ($case -eq 'failure') { throw 'Simulated storage failure' }
+  $disk.PartitionStyle = 'GPT'
+}
+function Set-Disk($Path, $PartitionStyle) { $calls.Add('convert'); $disk.PartitionStyle = 'GPT' }
+foreach ($case in 'RAW','GPT','MBR','failure','occupied') {
+  $calls = New-Object 'System.Collections.Generic.List[string]'
+  $n = 9999
+  $disk = [pscustomobject]@{ Path='mock'; Number=$n; PartitionStyle=$case; NumberOfPartitions=0 }
+  if ($case -eq 'failure') { $disk.PartitionStyle = 'RAW' }
+  if ($case -eq 'occupied') { $disk.PartitionStyle = 'GPT'; $disk.NumberOfPartitions = 1 }
+  try { ${prepareClearedGpt} }
+  catch {
+    if ($case -eq 'failure' -and $_.Exception.Message -eq 'Simulated storage failure') { continue }
+    if ($case -eq 'occupied' -and $_.Exception.Message -like '*not empty*' -and !$calls.Count) { continue }
+    throw
+  }
+  $expected = @{ RAW='init'; MBR='convert'; GPT='' }
+  if (!$expected.ContainsKey($case) -or ($calls -join ',') -ne $expected[$case] -or $disk.PartitionStyle -ne 'GPT') {
+    throw "Unexpected outcome for $case"
+  }
+}
+exit 0`]);
+});
 
 describe('Linux imaging', () => {
+  it('copies nested EFI files and the root marker via a Windows volume GUID', { skip: process.platform !== 'win32' }, async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'osit-volume-copy-'));
+    try {
+      const drive = parse(dir).root;
+      assert.match(drive, /^[a-z]:\\$/i);
+      const { stdout } = await runOrThrow('mountvol.exe', [drive, '/L']);
+      const volume = stdout.trim();
+      assert.match(volume, /^\\\\\?\\Volume\{[0-9a-f-]{36}\}\\$/i);
+      const source = join(dir, 'source'), target = join(dir, 'target');
+      await mkdir(source);
+      await mkdir(target);
+      const entries = ['EFI/BOOT/BOOTX64.EFI', 'EFI/ubuntu/grub.cfg', 'casper/initrd', 'marker.tag'];
+      await mkdir(join(source, 'EFI/BOOT'), { recursive: true });
+      await mkdir(join(source, 'EFI/ubuntu'));
+      await mkdir(join(source, 'casper'));
+      for (const file of entries) await writeFile(join(source, file), file);
+      await copySignedBootFiles(source, join(volume, relative(drive, target)), entries, new AbortController().signal);
+      for (const file of entries) assert.equal(await readFile(join(target, file), 'utf8'), file);
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
   const body = { family: 'linux', imageId: 'ubuntu-desktop', persistent: false, targetName: 'USB', targetBytes: 10000, deviceId: '/dev/sdb' };
+  it('keeps older clients in raw mode and rejects unsupported file-mode combinations', () => {
+    assert.equal(parseCreateUsbRequest(body).linux?.writeMode, 'raw');
+    assert.throws(() => parseCreateUsbRequest({ ...body, writeMode: 'invalid' }), /write mode/);
+    assert.throws(() => parseCreateUsbRequest({ ...body, writeMode: 'iso', imageId: 'kali-installer' }), /ISO file mode/);
+    for (const change of [{ persistent: true }, { imageId: 'ubuntu-server' }]) {
+      assert.throws(() => parseCreateUsbRequest({ ...body, ...change, writeMode: 'signed-grub' }), /Signed GRUB mode/);
+    }
+    if (process.platform === 'win32') assert.equal(parseCreateUsbRequest({ ...body, writeMode: 'signed-grub' }).linux?.writeMode, 'signed-grub');
+    else assert.throws(() => parseCreateUsbRequest({ ...body, writeMode: 'signed-grub' }), /Windows/);
+    if (process.platform === 'win32') assert.equal(parseCreateUsbRequest({ ...body, writeMode: 'iso' }).linux?.writeMode, 'iso');
+    else assert.throws(() => parseCreateUsbRequest({ ...body, writeMode: 'iso' }), /Windows helper/);
+  });
+  it('preflights the Ubuntu tree before copying its EFI, live and hidden files', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'osit-iso-test-'));
+    const signal = new AbortController().signal;
+    const target = await mkdtemp(join(tmpdir(), 'osit-fat-test-'));
+    try {
+      await assert.rejects(inspectUbuntuTree(root, 2 ** 30, signal), /bootx64/);
+      for (const dir of ['EFI/BOOT', 'boot/grub', 'casper', '.disk']) await mkdir(join(root, dir), { recursive: true });
+      for (const p of ['EFI/BOOT/BOOTX64.EFI', 'EFI/BOOT/grubx64.efi', 'boot/grub/grub.cfg', 'casper/vmlinuz', 'casper/initrd', '.disk/info'])
+        await writeFile(join(root, p), p);
+      await assert.rejects(inspectUbuntuTree(root, 1024, signal), /not fit/);
+      await copyUbuntuTree(root, target, await inspectUbuntuTree(root, 2 ** 30, signal), signal, () => {});
+      assert.equal(await readFile(join(target, '.disk/info'), 'utf8'), '.disk/info');
+    } finally { await Promise.all([root, target].map(dir => rm(dir, { recursive: true, force: true }))); }
+  });
   it('derives the source in the helper and refuses incompatible options or replacement devices', () => {
     const job = parseCreateUsbRequest(body);
     assert.equal(job.iso.kind, 'url');

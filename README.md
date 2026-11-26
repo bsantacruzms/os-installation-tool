@@ -25,15 +25,40 @@ See the [tool family icon guide](docs/branding/README.md) for the editable artwo
 
 To build the desktop executable on Windows after building `packages/web`, run
 `npm --prefix packages/desktop ci` and `npm --prefix packages/desktop run build`.
-The portable x64 executable is written to `packages/desktop/dist/`.
+The portable x64 executable is written to `packages/desktop/dist/`. Each successful
+desktop build replaces `_output/OS-Installation-Tool.exe` rather than accumulating
+versioned copies. Close the previous app before building if Windows has it locked.
 
 Select **Linux (x86-64)** and choose Ubuntu Desktop, Ubuntu Server, Linux Mint,
 Fedora Workstation, Debian Live or Kali Installer. The helper downloads the selected
 release through its official channel (including project-directed HTTPS mirrors), or
 accepts a full path to a local copy of that exact ISO. It checks the published,
 pinned SHA-256 before erasing anything. Only removable USB/SD drives are eligible.
-The helper writes the whole image and verifies it by reading it back. Windows setup
-files, FAT32 formatting and WIM tools are not used for Linux builds.
+**Which USB write mode should I pick?**
+
+- **ISO files (recommended)** for Ubuntu Desktop on a Windows helper targeting
+  an x64 UEFI PC, including Intel/AMD Surface models. The helper creates a GPT
+  disk with one visible FAT32 volume, copies the Ubuntu files including the EFI
+  bootloader, and verifies each copied file. The volume is capped at 32,000 MiB
+  on larger drives. The helper checks file sizes and capacity *before* erasing;
+  it never splits Linux files or silently switches modes.
+- **Raw image (DD)** if you need the distribution's exact partition layout or
+  want to try an alternative when file mode fails. The helper writes and reads
+  back the image sector-for-sector. Windows may show multiple letters or no
+  browsable files. This is the existing mode for all other catalog images and
+  non-Windows hosts. Neither mode guarantees that a particular PC can run Ubuntu.
+- **Signed GRUB + ISO (experimental)** for Ubuntu Desktop on x64 UEFI PCs,
+  built from Windows without Ventoy. Use this to test an alternate boot path,
+  not as a guaranteed Surface fix. Before erasing anything the helper fetches
+  SHA-256-pinned Ubuntu archive packages, extracts the Microsoft-signed NX shim
+  and Canonical-signed disk GRUB, and stages the verified ISO's kernel and initrd.
+  The USB gets a 512 MiB FAT32 EFI partition with an app-generated GRUB menu
+  and an NTFS data partition with the intact ISO. GRUB loads the kernel from FAT;
+  Ubuntu's initramfs locates the ISO by its unique path. No key enrollment,
+  firmware edits, or Secure Boot disablement are part of this workflow. A target
+  that distrusts or has revoked a loader may refuse to boot; stop there rather
+  than changing its trust settings. Rebuild the USB instead of replacing its ISO
+  in Explorer: the boot partition's kernel and initrd must match.
 
 The portable Windows helper is a single executable. Run it as Administrator, open
 `http://127.0.0.1:5179`, choose an image and settings, then confirm **Create USB**.
@@ -50,6 +75,14 @@ on the helper host. Select the USB in the test PC's one-time boot menu, choose
 to check persistence. Do not start the installer for this test.
 
 ## How Windows media is built
+
+**Choosing between tools:** [balenaEtcher](https://etcher.balena.io/) is a good
+fit for writing a ready-made disk image as-is and validating the flash. This
+tool focuses on preparing an installer: official image selection, Windows setup
+customization, and different Ubuntu USB layouts. Linux write verification checks
+the media; it cannot certify that a particular computer will reach the desktop.
+If creation fails, the progress screen identifies the stage that stopped and the
+detailed log shows the preceding steps. A finished download isn't a finished USB.
 
 1. Resolves the latest official Windows 11 ISO link from Microsoft's own download service.
 2. Downloads it (resumable) to your machine. Nothing is mirrored, repackaged or redistributed.

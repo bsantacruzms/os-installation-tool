@@ -131,8 +131,6 @@ export interface DebloatConfig {
   packages: string[];
   /** Prevent OneDrive's per-user setup from running. */
   disableOneDriveSetup: boolean;
-  /** Hide the Copilot and Recall entry points. */
-  disableCopilot: boolean;
 }
 
 export interface WindowsBuildConfig {
@@ -232,10 +230,11 @@ export interface JobProgress {
   bytesPerSecond?: number;
   etaSeconds?: number;
   error?: string;
+  stoppedDuring?: JobPhase;
 }
 
 export interface CreateUsbRequest {
-  linux?: { imageId: string; persistent: boolean; targetBytes: number; targetName: string };
+  linux?: { imageId: string; writeMode: 'raw' | 'iso' | 'signed-grub'; persistent: boolean; targetBytes: number; targetName: string };
   deviceId: string;
   /** Resolved ISO to download, or a path to a local ISO. */
   iso: { kind: 'url'; url: string; fileName: string; sizeBytes?: number; sha256?: string } | { kind: 'local'; path: string };

@@ -107,7 +107,6 @@ export function normalizeWindowsConfig(input: unknown): WindowsBuildConfig {
         ? stringList(debloat['packages'], 256, 128).filter((p) => /^[A-Za-z0-9._-]+$/.test(p))
         : base.debloat.packages,
       disableOneDriveSetup: bool(debloat['disableOneDriveSetup'], base.debloat.disableOneDriveSetup),
-      disableCopilot: bool(debloat['disableCopilot'], base.debloat.disableCopilot),
     },
     // Only reachable from the Advanced tab, and only ever run on the user's own PC.
     extraSetupCommands: stringList(raw['extraSetupCommands'], 32, 1024).filter((c) => !/[\r\n]/.test(c)),

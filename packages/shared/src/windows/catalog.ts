@@ -46,7 +46,7 @@ export const windowsImageVariants: readonly ImageVariant[] = [
     approximateBytes: 5_200_000_000,
     evaluation: true,
     landingUrl: 'https://www.microsoft.com/evalcenter/evaluate-windows-11-enterprise-ltsc-2024',
-    notes: ['Evaluation media expires after 90 days.', 'No Microsoft Store, Copilot or Widgets in this edition.'],
+    notes: ['Evaluation media expires after 90 days.', 'No Microsoft Store or Widgets in this edition.'],
   },
   {
     id: 'custom-iso',

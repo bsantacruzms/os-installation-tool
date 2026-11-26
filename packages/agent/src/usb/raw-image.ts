@@ -10,6 +10,8 @@ import { downloadFile, sha256File } from '../download.js';
 import { runOrThrow } from '../process.js';
 import { preparePersistentUbuntu } from './ubuntu-persistence.js';
 import { isWindowsElevated } from './windows.js';
+import { writeUbuntuFiles } from './ubuntu-iso.js';
+import { writeSignedGrub } from './signed-grub.js';
 import type { WriterOptions } from './writer.js';
 
 type Selection = NonNullable<CreateUsbRequest['linux']>;
@@ -116,8 +118,27 @@ export async function createLinuxUsb({ request, workDirectory, events, signal }:
         } });
     }
     signal.throwIfAborted();
+    if (selection.writeMode === 'iso') {
+      if (process.platform !== 'win32' || image.id !== 'ubuntu-desktop' || selection.persistent)
+        throw new Error('ISO file mode requires standard Ubuntu Desktop on Windows.');
+      await writeUbuntuFiles(iso, getTarget, events, signal);
+    } else if (selection.writeMode === 'signed-grub') {
+      if (process.platform !== 'win32' || image.id !== 'ubuntu-desktop' || selection.persistent)
+        throw new Error('Unsupported signed GRUB configuration.');
+      await writeSignedGrub(iso, image.sha256, getTarget, events, signal);
+    } else await writeRaw();
+    if (request.keepIso && request.iso.kind === 'url') {
+      kept = true;
+      events.onLog(`Kept the verified official ISO at ${iso}`);
+    }
+  } finally {
+    if (!kept) await rm(dir, { recursive: true, force: true });
+    else if (selection.persistent) await rm(join(dir, 'persistent.iso'), { force: true });
+  }
+
+  async function writeRaw() {
     let path = iso;
-    let digest = image.sha256;
+    let digest = image!.sha256;
     if (selection.persistent) {
       events.onPhase('verifying', 'Building Ubuntu Desktop media with a 1 GiB writable partition');
       path = await preparePersistentUbuntu(dir, iso, signal);
@@ -129,7 +150,7 @@ export async function createLinuxUsb({ request, workDirectory, events, signal }:
       const device = await getTarget();
       if (!size || size % 512 || size > device.sizeBytes) throw new Error('The prepared image does not fit this USB drive.');
       signal.throwIfAborted();
-      events.onPhase('imaging', `Erasing ${device.description} and writing ${image.name}`);
+      events.onPhase('imaging', `Erasing ${device.description} and writing ${image!.name}`);
       const target = await prepareTarget(device);
       await getTarget();
       signal.throwIfAborted();
@@ -144,12 +165,5 @@ export async function createLinuxUsb({ request, workDirectory, events, signal }:
         });
       } finally { await output.close(); }
     } finally { await input.close(); }
-    if (request.keepIso && request.iso.kind === 'url') {
-      kept = true;
-      events.onLog(`Kept the verified official ISO at ${iso}`);
-    }
-  } finally {
-    if (!kept) await rm(dir, { recursive: true, force: true });
-    else if (selection.persistent) await rm(join(dir, 'persistent.iso'), { force: true });
   }
 }

@@ -89,7 +89,6 @@ export function defaultWindowsConfig(mode: UiMode = 'easy'): WindowsBuildConfig 
       removeProvisionedApps: true,
       packages: [...defaultDebloatPackages],
       disableOneDriveSetup: true,
-      disableCopilot: true,
     },
     extraSetupCommands: [],
   };

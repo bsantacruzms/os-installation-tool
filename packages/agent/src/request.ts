@@ -96,6 +96,12 @@ export function parseCreateUsbRequest(body: unknown): CreateUsbRequest {
     if (!image || raw['iso'] !== undefined || raw['plan'] !== undefined)
       throw new RequestValidationError('Select an official Linux image from the catalog.');
     const persistent = raw['persistent'];
+    const writeMode = raw['writeMode'] === undefined ? 'raw' : raw['writeMode'];
+    if (writeMode !== 'raw' && writeMode !== 'iso' && writeMode !== 'signed-grub') throw new RequestValidationError('Unknown Linux write mode.');
+    if (writeMode === 'signed-grub' && (process.platform !== 'win32' || image.id !== 'ubuntu-desktop' || persistent !== false))
+      throw new RequestValidationError('Signed GRUB mode requires Ubuntu Desktop on Windows without persistence.');
+    if (writeMode === 'iso' && (process.platform !== 'win32' || image.id !== 'ubuntu-desktop' || persistent !== false))
+      throw new RequestValidationError('ISO file mode requires Ubuntu Desktop on a Windows helper without persistence.');
     if (persistent === true && process.platform === 'win32')
       throw new RequestValidationError('Persistence is not supported by the portable Windows helper. Choose a standard Linux USB.');
     if (typeof persistent !== 'boolean' || (persistent && image.id !== 'ubuntu-desktop'))
@@ -104,7 +110,7 @@ export function parseCreateUsbRequest(body: unknown): CreateUsbRequest {
     if (typeof targetBytes !== 'number' || !Number.isSafeInteger(targetBytes) || targetBytes <= 0)
       throw new RequestValidationError('Confirm the USB drive and its capacity.');
     return {
-      linux: { imageId: image.id, persistent, targetBytes, targetName: requiredString(raw['targetName'], 'targetName', 512) },
+      linux: { imageId: image.id, writeMode, persistent, targetBytes, targetName: requiredString(raw['targetName'], 'targetName', 512) },
       deviceId: requiredString(raw['deviceId'], 'deviceId', 512),
       iso: raw['localPath'] === undefined
         ? { kind: 'url', url: image.url, fileName: image.fileName, sha256: image.sha256 }

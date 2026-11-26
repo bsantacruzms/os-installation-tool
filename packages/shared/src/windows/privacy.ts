@@ -135,17 +135,14 @@ export const privacyTweaks: readonly PrivacyTweak[] = [
     ],
   },
   {
-    id: 'copilot-recall',
-    label: 'Disable Copilot and Recall',
-    description:
-      'Turns off Windows Copilot and blocks Recall from taking periodic screenshots of everything you do.',
+    id: 'disable-recall',
+    label: 'Disable Recall',
+    description: 'Blocks Recall from taking periodic snapshots.',
     category: 'ai',
     recommended: true,
     registry: [
-      { hive: HKLM, key: 'SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot', name: 'TurnOffWindowsCopilot', type: 'REG_DWORD', value: 1 },
       { hive: HKLM, key: 'SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI', name: 'DisableAIDataAnalysis', type: 'REG_DWORD', value: 1 },
       { hive: HKLM, key: 'SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI', name: 'AllowRecallEnablement', type: 'REG_DWORD', value: 0 },
-      { hive: HKCU, key: 'SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsCopilot', name: 'TurnOffWindowsCopilot', type: 'REG_DWORD', value: 1 },
     ],
   },
   {

@@ -260,6 +260,6 @@ async function describeAgent(version: string, workDirectory: string): Promise<Ag
     arch: process.arch,
     elevated,
     workDirectory,
-    capabilities: { ...capabilities, ready: prerequisites.ok, linuxImaging: true, ubuntuPersistence: process.platform !== 'win32' },
+    capabilities: { ...capabilities, ready: prerequisites.ok, linuxImaging: true, ubuntuIsoFiles: process.platform === 'win32', signedGrub: process.platform === 'win32', ubuntuPersistence: process.platform !== 'win32' },
   };
 }

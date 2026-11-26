@@ -31,10 +31,16 @@ export function App() {
   const [localPath, setLocalPath] = useState('');
   const image = linuxImages.find((entry) => entry.id === imageId)!;
   const linux = family === 'linux';
+  const [preferredMode, setPreferredMode] = useState<'iso' | 'raw' | 'signed-grub'>('iso');
+  const canExtract = image.id === 'ubuntu-desktop' && agent.info?.capabilities.ubuntuIsoFiles === true;
+  const canUseSignedGrub = canExtract && agent.info?.capabilities.signedGrub === true;
+  const writeMode = !canExtract ? 'raw' : preferredMode === 'signed-grub' && !canUseSignedGrub ? 'iso' : preferredMode;
   const plan: BuildPlan | null = linux ? {
     injectedFiles: [], removedPaths: [], warnings: [],
     summary: [`Verify ${image.fileName} against its published SHA-256 before erasing the USB.`,
-      persistent ? 'Add 1 GiB of unencrypted storage for the Ubuntu live session.' : 'Write the official image unchanged and verify it by reading back the USB.'],
+      writeMode === 'signed-grub' ? 'Erase the USB and create a FAT32 EFI partition with official signed loaders plus an NTFS partition containing the intact Ubuntu ISO.' :
+        writeMode === 'iso' ? 'Create one Explorer-readable GPT/FAT32 volume for x64 UEFI boot. Copy and verify the Ubuntu files.' :
+        persistent ? 'Add 1 GiB of unencrypted storage for the Ubuntu live session.' : 'Write the official image unchanged and verify it by reading back the USB.'],
     bootSteps: ['Use the target x86-64 PC’s one-time boot menu and choose the USB.',
       image.live ? `Choose the live or try option to run ${image.name} without installing. Start its installer only if you want to change the PC’s disk.` : `Follow the ${image.name} installer. This image is not a live desktop.`,
       ...(image.live ? [persistent ? 'Save a file in your home folder, restart from the stick, and check it is still there.' : 'Live-session changes are lost on restart.'] : [])],
@@ -73,7 +79,7 @@ export function App() {
     && (!(requireRemovable || linux) || selectedDevice.removable)
     && (!linux || (agent.info?.capabilities.linuxImaging && ['usb', 'sd'].includes(selectedDevice.bus))));
 
-  useEffect(() => { setConfirming(false); setStartError(null); }, [family, imageId, localPath, persistent, deviceId, requireRemovable, agent]);
+  useEffect(() => { setConfirming(false); setStartError(null); }, [family, imageId, localPath, persistent, deviceId, requireRemovable, agent, writeMode]);
 
   const start = useCallback(async () => {
     if (!readyToCreate || !plan || !agent.client || !selectedDevice) return;
@@ -83,7 +89,7 @@ export function App() {
       const language = catalog.languages.find((entry) => entry.tag === config.image.language);
       const iso = linux ? null : await agent.client.resolveIso(config.image.arch, config.image.language, language?.microsoftName ?? 'English');
       const created = await agent.client.createJob(!iso ? {
-        family, imageId, persistent, deviceId: selectedDevice.id, targetName: selectedDevice.description,
+        family, imageId, writeMode, persistent, deviceId: selectedDevice.id, targetName: selectedDevice.description,
         targetBytes: selectedDevice.sizeBytes, keepIso, ...(localPath.trim() ? { localPath: localPath.trim() } : {}),
       } : {
         deviceId: selectedDevice.id,
@@ -111,7 +117,7 @@ export function App() {
     } finally {
       setStarting(false);
     }
-  }, [agent.client, catalog, config, keepIso, plan, requireRemovable, selectedDevice, linux, family, imageId, persistent, localPath, readyToCreate]);
+  }, [agent.client, catalog, config, keepIso, plan, requireRemovable, selectedDevice, linux, family, imageId, persistent, localPath, readyToCreate, writeMode]);
 
   return (
     <main className={`shell${compact ? ' workstation' : ''}`}>
@@ -157,6 +163,16 @@ export function App() {
           <Card title="Operating system">
             <Field label="USB image family"><Select value={family} onChange={setFamily}
               options={[{ value: 'windows', label: 'Windows 11' }, { value: 'linux', label: 'Linux (x86-64)' }]} /></Field>
+            {linux && canExtract && <Field label="USB write mode" hint={writeMode === 'iso'
+              ? 'For x64 UEFI PCs. Browse the USB in Explorer.'
+              : writeMode === 'signed-grub' ? 'Experimental alternate Ubuntu boot menu. Leave Secure Boot on; existing firmware trust must accept the signed loader.'
+              : 'Exact image layout. Use for legacy boot or if ISO mode fails; Explorer may not show files.'}>
+              <Select value={writeMode} onChange={setPreferredMode} options={[
+                { value: 'iso', label: 'ISO files (recommended)' }, { value: 'raw', label: 'Raw image (DD)' },
+                ...(canUseSignedGrub ? [{ value: 'signed-grub' as const, label: 'Signed GRUB + ISO (experimental)' }] : []),
+              ]} />
+            </Field>}
+            {linux && agent.info && !canExtract && <p className="muted">Raw image (DD): preserves this image’s boot layout. ISO file mode requires Ubuntu Desktop and an updated Windows helper.</p>}
           </Card>
           {linux ? <Card title="Linux image" subtitle="Choose your settings first. After you confirm Create USB, the helper downloads the image on this computer and verifies it before erasing the stick.">
             <Field label="Distribution"><Select value={imageId} onChange={(id) => { setImageId(id); setPersistent(false); setLocalPath(''); }}

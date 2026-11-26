@@ -7,7 +7,8 @@
   "private": true,
   "main": "build/main.cjs",
   "scripts": {
-    "build": "node build.mjs && electron-builder --win portable --x64 --publish never"
+    "build": "node build.mjs && electron-builder --win portable --x64 --publish never",
+    "postbuild": "node publish-local.mjs"
   },
   "devDependencies": {
     "@resvg/resvg-js": "2.6.2",
